@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <meta name="theme-color" content="#8990BB" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Soft Continuum ∞ Info</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --fg: #aab0d0;
+      --line: rgba(209, 203, 255, 0.18);
+      --panel: rgba(137, 144, 187, 0.22);
+      --panel-strong: rgba(137, 144, 187, 0.44);
+      --header-bg: #8990BB;
+      --header-edge: rgba(255, 255, 255, 0.12);
+      --shadow: rgba(72, 62, 111, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      padding: 0;
+    }
+
+    .page {
+      width: 100%;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .header {
+      position: absolute;
+      inset: 0 0 auto 0;
+      z-index: 3;
+      pointer-events: auto;
+    }
+
+    .header-panel {
+      position: relative;
+      min-height: clamp(138px, 19vh, 184px);
+      padding: 24px 28px 10px;
+      overflow: visible;
+      pointer-events: auto;
+    }
+
+    .header-blur {
+      display: none;
+    }
+
+    .headline {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 0;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(38px, 4.8vw, 64px);
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      line-height: 0.94;
+      text-transform: none;
+      text-shadow: 0 2px 18px rgba(28, 26, 48, 0.24);
+    }
+
+    .infinity-link {
+      position: absolute;
+      top: 24px;
+      right: 28px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--fg);
+      text-decoration: none;
+      pointer-events: auto;
+    }
+
+    .infinity-link:hover,
+    .infinity-link:focus-visible {
+      opacity: 0.72;
+      outline: none;
+    }
+
+    .infinity-link svg {
+      width: clamp(52px, 5.6vw, 84px);
+      height: clamp(28px, 2.8vw, 40px);
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 2px 18px rgba(28, 26, 48, 0.24));
+    }
+
+    .viewer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      pointer-events: auto;
+    }
+
+    .content {
+      width: 100%;
+      min-height: 100%;
+      padding: 200px 32px 32px;
+      background: transparent;
+      pointer-events: auto;
+      overflow: auto;
+    }
+
+    .content-inner {
+      width: min(760px, 100%);
+    }
+
+    .content p {
+      margin: 0 0 14px;
+      font-size: clamp(18px, 1.8vw, 24px);
+      line-height: 1.42;
+    }
+
+    .content p:last-child {
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 720px) {
+      .header-panel {
+        min-height: 124px;
+        padding: 14px 14px 24px;
+      }
+
+      .headline {
+        margin-bottom: 0;
+      }
+
+      .infinity-link {
+        top: 14px;
+        right: 14px;
+      }
+
+      .content {
+        padding: 160px 14px 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="header-panel">
+        <div class="header-blur" aria-hidden="true"></div>
+        <div class="headline">
+          <h1>Info ∞</h1>
+        </div>
+        <a href="index.html" class="infinity-link" aria-label="Back to index">
+          <svg viewBox="0 0 40 24" aria-hidden="true">
+            <path d="M37 12H6"/>
+            <path d="M13 19 6 12l7-7"/>
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <section class="viewer" aria-label="Фон страницы">
+      <div class="overlay">
+        <section class="content" aria-label="Информация о работе">
+          <div class="content-inner">
+            <p>Generative artwork prepared for web presentation and mint display.</p>
+            <p>Medium: HTML / JavaScript / WebGL.</p>
+            <p>Year: 2026.</p>
+            <p>This page can be expanded with edition details, token metadata, statement, and provenance.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

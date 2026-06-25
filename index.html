@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <meta name="theme-color" content="#8990BB" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Soft Continuum ∞</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --fg: #aab0d0;
+      --line: rgba(209, 203, 255, 0.18);
+      --header-bg: #8990BB;
+      --header-edge: rgba(255, 255, 255, 0.12);
+      --shadow: rgba(72, 62, 111, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      padding: 0;
+    }
+
+    .page {
+      width: 100%;
+      margin: 0 auto;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .header {
+      position: absolute;
+      inset: 0 0 auto 0;
+      z-index: 2;
+      padding: 0;
+      pointer-events: none;
+    }
+
+    .header-panel {
+      position: relative;
+      min-height: clamp(138px, 19vh, 184px);
+      padding: 24px 28px 10px;
+      overflow: visible;
+      pointer-events: auto;
+      border-bottom: 0;
+    }
+
+    .header-blur {
+      display: none;
+    }
+
+    .header-top,
+    .header-bottom {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    a,
+    button {
+      color: var(--fg);
+      font: inherit;
+      font-size: clamp(16px, 1.5vw, 22px);
+      font-weight: 300;
+      letter-spacing: 0;
+      text-transform: none;
+      text-decoration: none;
+      text-shadow: 0 1px 10px rgba(28, 26, 48, 0.22);
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(38px, 4.8vw, 64px);
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      line-height: 0.94;
+      text-transform: none;
+      text-shadow: 0 2px 18px rgba(28, 26, 48, 0.24);
+    }
+
+    .viewer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      border: 0;
+      background: #121826;
+      overflow: hidden;
+      box-shadow: 0 30px 60px var(--shadow);
+    }
+
+    iframe {
+      position: absolute;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0f1534;
+    }
+
+    button {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    button:hover,
+    button:focus-visible,
+    a:hover,
+    a:focus-visible {
+      opacity: 0.72;
+      outline: none;
+    }
+
+    .headline {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 52px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: clamp(18px, 3vw, 48px);
+      flex-wrap: wrap;
+    }
+
+    .nav-right {
+      justify-content: flex-end;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    .icon-link,
+    .icon-button {
+      width: 24px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+    }
+
+    .icon-link svg,
+    .icon-button svg {
+      width: 24px;
+      height: 24px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.85;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 0;
+      }
+
+      .page {
+        min-height: 100vh;
+      }
+
+      .header {
+        padding: 0;
+      }
+
+      .header-panel {
+        min-height: 124px;
+        padding: 14px 14px 24px;
+      }
+
+      .header-top,
+      .header-bottom {
+        flex-direction: column;
+        gap: 16px;
+      }
+
+      .headline {
+        margin-bottom: 0;
+      }
+
+      .nav,
+      .nav-right {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="header-panel">
+        <div class="header-blur" aria-hidden="true"></div>
+        <div class="headline">
+          <h1>Soft Continuum ∞</h1>
+        </div>
+        <div class="header-bottom">
+          <nav class="nav" aria-label="Основная навигация">
+            <a href="index.html">Index</a>
+            <a href="collect.html">Collect</a>
+            <a href="gallery.html">Gallery</a>
+            <a href="info.html">Info</a>
+            <a href="verse-test.html">Verse Test</a>
+          </nav>
+          <div class="spacer" aria-hidden="true"></div>
+          <nav class="nav nav-right" aria-label="Управление работой">
+            <button type="button" id="reload-work" class="icon-button" aria-label="Reload work">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 11a8 8 0 1 1-2.34-5.66"/>
+                <path d="M20 4v5h-5"/>
+              </svg>
+            </button>
+            <a
+              href="Infinite_everglade_no_magentaCore.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="icon-link"
+              aria-label="Open in new tab">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 5h5v5"/>
+                <path d="M10 14 19 5"/>
+                <path d="M19 13v6H5V5h6"/>
+              </svg>
+            </a>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <section class="viewer" aria-label="Окно работы">
+      <iframe
+        id="artwork-frame"
+        src="Infinite_everglade_no_magentaCore.html"
+        title="Soft Continuum ∞"
+        loading="eager"></iframe>
+    </section>
+  </main>
+
+  <script>
+    const frame = document.getElementById("artwork-frame");
+    const reloadButton = document.getElementById("reload-work");
+    const artworkPath = "Infinite_everglade_no_magentaCore.html";
+
+    function notifyArtworkResize() {
+      const innerWindow = frame.contentWindow;
+      if (!innerWindow) return;
+      innerWindow.dispatchEvent(new Event("resize"));
+    }
+
+    const frameResizeObserver = new ResizeObserver(() => {
+      notifyArtworkResize();
+    });
+
+    frameResizeObserver.observe(frame);
+
+    frame.addEventListener("load", () => {
+      notifyArtworkResize();
+      requestAnimationFrame(() => notifyArtworkResize());
+      setTimeout(notifyArtworkResize, 120);
+    });
+
+    window.addEventListener("load", () => {
+      notifyArtworkResize();
+    });
+
+    reloadButton.addEventListener("click", () => {
+      frame.src = `${artworkPath}?t=${Date.now()}`;
+    });
+  </script>
+</body>
+</html>

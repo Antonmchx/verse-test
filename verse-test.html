@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <meta name="theme-color" content="#8990BB" />
+  <title>Soft Continuum ∞ Verse Sandbox</title>
+  <style>
+    :root {
+      --bg: #f3ede2;
+      --panel: rgba(255, 255, 255, 0.72);
+      --panel-strong: rgba(255, 255, 255, 0.9);
+      --ink: #5a627f;
+      --muted: #7983a7;
+      --accent: #8990bb;
+      --accent-strong: #6f77a8;
+      --line: rgba(99, 110, 154, 0.18);
+      --shadow: rgba(56, 54, 87, 0.12);
+      --ok: #2c8d66;
+      --warn: #ae7a1d;
+      --bad: #a94949;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top right, rgba(137, 144, 187, 0.2), transparent 28%),
+        radial-gradient(circle at bottom left, rgba(170, 176, 208, 0.24), transparent 22%),
+        var(--bg);
+      color: var(--ink);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      padding: 24px;
+    }
+
+    .shell {
+      max-width: 1380px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(340px, 430px) minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: 0 30px 70px var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .sidebar {
+      padding: 28px;
+      position: sticky;
+      top: 24px;
+    }
+
+    .eyebrow,
+    .hint,
+    .meta,
+    label,
+    input,
+    textarea,
+    button,
+    a {
+      font: inherit;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 14px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(34px, 4vw, 56px);
+      line-height: 0.94;
+      font-weight: 300;
+      letter-spacing: -0.05em;
+      color: var(--accent-strong);
+    }
+
+    .intro {
+      margin: 14px 0 26px;
+      color: var(--ink);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+
+    .meta {
+      margin: 0 0 26px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .field {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(112, 122, 164, 0.24);
+      border-radius: 16px;
+      background: var(--panel-strong);
+      color: var(--ink);
+      padding: 13px 15px;
+      outline: none;
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    textarea {
+      min-height: 94px;
+      resize: vertical;
+    }
+
+    input:focus,
+    textarea:focus {
+      border-color: rgba(111, 119, 168, 0.64);
+      box-shadow: 0 0 0 4px rgba(137, 144, 187, 0.12);
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    button,
+    .link-button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 16px;
+      background: var(--accent);
+      color: #f8f7fb;
+      cursor: pointer;
+      transition: transform 140ms ease, opacity 140ms ease, background 140ms ease;
+      text-decoration: none;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    button.secondary,
+    .link-button.secondary {
+      background: rgba(137, 144, 187, 0.16);
+      color: var(--accent-strong);
+    }
+
+    button:hover,
+    button:focus-visible,
+    .link-button:hover,
+    .link-button:focus-visible {
+      opacity: 0.9;
+      transform: translateY(-1px);
+      outline: none;
+    }
+
+    .status-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 20px 0 0;
+    }
+
+    .pill {
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      background: rgba(137, 144, 187, 0.12);
+      color: var(--accent-strong);
+    }
+
+    .workspace {
+      padding: 22px;
+      min-height: calc(100vh - 48px);
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      padding: 22px;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--accent-strong);
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .console {
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .console-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .console-header h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 400;
+      color: var(--accent-strong);
+    }
+
+    .log {
+      margin: 0;
+      padding: 20px 22px 24px;
+      min-height: 320px;
+      max-height: 48vh;
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.44);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .ok {
+      color: var(--ok);
+    }
+
+    .warn {
+      color: var(--warn);
+    }
+
+    .bad {
+      color: var(--bad);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .note-list {
+      margin: 14px 0 0;
+      padding-left: 18px;
+      color: var(--ink);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    @media (max-width: 1040px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 14px;
+      }
+
+      .sidebar,
+      .card {
+        padding: 18px;
+      }
+
+      .button-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <aside class="panel sidebar">
+      <p class="eyebrow">Verse Sandbox</p>
+      <h1>Soft Continuum ∞</h1>
+      <p class="intro">
+        Локальный полигон для проверки Verse Elements на <code>localhost</code>.
+        Здесь можно по шагам проверить авторизацию, reserves, bookmark и purchase flow.
+      </p>
+      <p class="meta">
+        Sandbox iframe: <code>https://iframe.demo.verse.works</code><br />
+        Sandbox GraphQL: <code>https://demo.verse.works/query</code>
+      </p>
+
+      <div class="field">
+        <label for="artwork-id">Artwork ID</label>
+        <input id="artwork-id" type="text" placeholder="Вставь Verse artworkId" />
+      </div>
+
+      <div class="field">
+        <label for="artwork-url">Публичная ссылка на тестовую работу</label>
+        <input id="artwork-url" type="url" placeholder="https://..." />
+      </div>
+
+      <div class="field">
+        <label for="user-input-json">Доп. userInput JSON для purchase</label>
+        <textarea id="user-input-json" placeholder='Например: [{"key":"example","value":"123"}]'></textarea>
+      </div>
+
+      <div class="button-grid">
+        <button type="button" id="save-config">Сохранить</button>
+        <button type="button" id="check-auth" class="secondary">Check auth</button>
+        <button type="button" id="sign-in">Sign in</button>
+        <button type="button" id="sign-out" class="secondary">Sign out</button>
+        <button type="button" id="check-reserves" class="secondary">Check reserves</button>
+        <button type="button" id="create-bookmark" class="secondary">Create bookmark</button>
+        <button type="button" id="open-purchase">Open purchase</button>
+        <button type="button" id="ping-graphql" class="secondary">Ping GraphQL</button>
+      </div>
+
+      <div class="actions">
+        <a class="link-button secondary" href="index.html">Назад к версии сайта</a>
+        <a class="link-button secondary" id="open-artwork-link" href="#" target="_blank" rel="noopener noreferrer">Открыть тестовую работу</a>
+      </div>
+
+      <div class="status-row">
+        <span class="pill" id="elements-status">SDK: not loaded</span>
+        <span class="pill" id="bookmark-status">Bookmark: none</span>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <div class="cards">
+        <article class="panel card">
+          <h2>Что проверяем</h2>
+          <p class="hint">
+            Сначала сохраняем <code>artworkId</code>, затем можно независимо тестировать sandbox API
+            и Verse Elements методы, не выкладывая страницу в интернет.
+          </p>
+          <ul class="note-list">
+            <li><code>Check auth</code> показывает, авторизован ли тестовый пользователь.</li>
+            <li><code>Sign in</code> открывает sandbox-диалог авторизации Verse.</li>
+            <li><code>Check reserves</code> показывает reserve access для текущей работы.</li>
+            <li><code>Create bookmark</code> нужен для collector-curated сценариев.</li>
+            <li><code>Open purchase</code> запускает purchase dialog для текущего artwork.</li>
+          </ul>
+        </article>
+
+        <article class="panel card">
+          <h2>Что понадобится от Verse</h2>
+          <p class="hint">
+            Для реальной проверки мне нужен хотя бы <code>artworkId</code> тестовой работы
+            или ссылка, по которой его можно найти. Если у тебя есть тестовый логин,
+            саму авторизацию можно будет пройти прямо в открытом браузере.
+          </p>
+          <ul class="note-list">
+            <li>Если purchase зависит от reserves, лучше проверять после входа в тестовый аккаунт.</li>
+            <li>Если это collector-curated release, мы сможем отдельно проверить <code>bookmark</code>.</li>
+            <li>GraphQL ping нужен просто чтобы убедиться, что sandbox endpoint доступен с localhost.</li>
+          </ul>
+        </article>
+      </div>
+
+      <article class="panel console">
+        <div class="console-header">
+          <h2>Event Log</h2>
+          <button type="button" id="clear-log" class="secondary">Очистить лог</button>
+        </div>
+        <pre class="log" id="log">Подготовка Verse sandbox…</pre>
+      </article>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/verse-embedded@1.1.5/dist/verse-elements.js"></script>
+  <script>
+    const SANDBOX_BASE_URL = "https://iframe.demo.verse.works";
+    const SANDBOX_GRAPHQL_URL = "https://demo.verse.works/query";
+    const STORAGE_KEY = "soft-continuum-verse-sandbox";
+
+    const artworkIdInput = document.getElementById("artwork-id");
+    const artworkUrlInput = document.getElementById("artwork-url");
+    const userInputJson = document.getElementById("user-input-json");
+    const elementsStatus = document.getElementById("elements-status");
+    const bookmarkStatus = document.getElementById("bookmark-status");
+    const logNode = document.getElementById("log");
+    const openArtworkLink = document.getElementById("open-artwork-link");
+
+    const buttons = {
+      saveConfig: document.getElementById("save-config"),
+      checkAuth: document.getElementById("check-auth"),
+      signIn: document.getElementById("sign-in"),
+      signOut: document.getElementById("sign-out"),
+      checkReserves: document.getElementById("check-reserves"),
+      createBookmark: document.getElementById("create-bookmark"),
+      openPurchase: document.getElementById("open-purchase"),
+      pingGraphql: document.getElementById("ping-graphql"),
+      clearLog: document.getElementById("clear-log")
+    };
+
+    let elements = null;
+    let bookmark = null;
+
+    function log(message, tone = "info") {
+      const time = new Date().toLocaleTimeString("ru-RU", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      });
+
+      const prefix = tone === "ok"
+        ? "[ok]"
+        : tone === "warn"
+          ? "[warn]"
+          : tone === "bad"
+            ? "[error]"
+            : "[info]";
+
+      const current = logNode.textContent.trim();
+      logNode.textContent = `${current ? `${current}\n` : ""}${time} ${prefix} ${message}`;
+      logNode.scrollTop = logNode.scrollHeight;
+    }
+
+    function saveState() {
+      const state = {
+        artworkId: artworkIdInput.value.trim(),
+        artworkUrl: artworkUrlInput.value.trim(),
+        userInputJson: userInputJson.value
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      updateArtworkLink();
+      log("Конфигурация сохранена в localStorage.", "ok");
+    }
+
+    function restoreState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+        artworkIdInput.value = saved.artworkId || "";
+        artworkUrlInput.value = saved.artworkUrl || "";
+        userInputJson.value = saved.userInputJson || "";
+      } catch (error) {
+        log(`Не удалось восстановить настройки: ${error.message}`, "warn");
+      }
+      updateArtworkLink();
+    }
+
+    function updateArtworkLink() {
+      const url = artworkUrlInput.value.trim();
+      openArtworkLink.href = url || "#";
+      openArtworkLink.setAttribute("aria-disabled", url ? "false" : "true");
+      openArtworkLink.style.opacity = url ? "1" : "0.45";
+      openArtworkLink.style.pointerEvents = url ? "auto" : "none";
+    }
+
+    function getArtworkId() {
+      const artworkId = artworkIdInput.value.trim();
+      if (!artworkId) {
+        throw new Error("Сначала укажи artworkId тестовой работы.");
+      }
+      return artworkId;
+    }
+
+    function parseExtraUserInput() {
+      const text = userInputJson.value.trim();
+      if (!text) return [];
+
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Доп. userInput должен быть JSON-массивом.");
+      }
+      return parsed;
+    }
+
+    function getPurchasePayload() {
+      const extraUserInput = parseExtraUserInput();
+      const combined = bookmark
+        ? [{ key: "$user_hash", value: bookmark.signedToken }, ...extraUserInput]
+        : extraUserInput;
+
+      return combined.length ? { userInput: combined } : {};
+    }
+
+    async function runAction(label, handler) {
+      try {
+        log(`${label}…`);
+        await handler();
+      } catch (error) {
+        log(`${label}: ${error.message}`, "bad");
+        console.error(error);
+      }
+    }
+
+    async function pingGraphql() {
+      const response = await fetch(SANDBOX_GRAPHQL_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          query: "query SandboxPing { __typename }"
+        })
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${JSON.stringify(json)}`);
+      }
+
+      log(`GraphQL ответил: ${JSON.stringify(json)}`, "ok");
+    }
+
+    async function initElements() {
+      if (!window.VerseElements) {
+        throw new Error("VerseElements SDK не загрузился.");
+      }
+
+      elements = new window.VerseElements({
+        baseUrl: SANDBOX_BASE_URL
+      });
+
+      elementsStatus.textContent = "SDK: sandbox ready";
+      log("VerseElements инициализирован на sandbox origin.", "ok");
+    }
+
+    buttons.saveConfig.addEventListener("click", saveState);
+    artworkUrlInput.addEventListener("input", updateArtworkLink);
+    buttons.clearLog.addEventListener("click", () => {
+      logNode.textContent = "";
+      log("Лог очищен.");
+    });
+
+    buttons.pingGraphql.addEventListener("click", () => runAction("Ping GraphQL", pingGraphql));
+
+    buttons.checkAuth.addEventListener("click", () => runAction("Check auth", async () => {
+      const isSignedIn = await elements.checkAuth();
+      log(`checkAuth(): ${isSignedIn}`, isSignedIn ? "ok" : "warn");
+    }));
+
+    buttons.signIn.addEventListener("click", () => runAction("Sign in", async () => {
+      const result = await elements.authorise();
+      log(`authorise(): ${JSON.stringify(result)}`, "ok");
+    }));
+
+    buttons.signOut.addEventListener("click", () => runAction("Sign out", async () => {
+      await elements.signOut();
+      log("Пользователь разлогинен.", "ok");
+    }));
+
+    buttons.checkReserves.addEventListener("click", () => runAction("Check reserves", async () => {
+      const artworkId = getArtworkId();
+      const reserves = await elements.checkReserves(artworkId);
+      log(`checkReserves(): ${JSON.stringify(reserves)}`, reserves ? "ok" : "warn");
+    }));
+
+    buttons.createBookmark.addEventListener("click", () => runAction("Create bookmark", async () => {
+      const artworkId = getArtworkId();
+      bookmark = await elements.createBookmark(artworkId);
+      bookmarkStatus.textContent = "Bookmark: ready";
+      log(`createBookmark(): ${JSON.stringify(bookmark)}`, "ok");
+    }));
+
+    buttons.openPurchase.addEventListener("click", () => runAction("Open purchase", async () => {
+      const artworkId = getArtworkId();
+      const payload = getPurchasePayload();
+
+      elements.openPurchaseDialog(
+        artworkId,
+        payload,
+        {
+          onSuccess(result) {
+            log(`Purchase success: ${JSON.stringify(result)}`, "ok");
+          },
+          onTerminalFailure(result) {
+            log(`Purchase failure: ${JSON.stringify(result)}`, "bad");
+          },
+          onClose() {
+            log("Purchase dialog закрыт.", "warn");
+          }
+        }
+      );
+
+      log(`Purchase dialog открыт для artworkId ${artworkId}.`, "ok");
+    }));
+
+    restoreState();
+    initElements().catch((error) => {
+      elementsStatus.textContent = "SDK: load failed";
+      log(`Ошибка инициализации SDK: ${error.message}`, "bad");
+    });
+  </script>
+</body>
+</html>

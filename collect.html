@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <meta name="theme-color" content="#8990BB" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Soft Continuum ∞ Collect</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --fg: #aab0d0;
+      --line: rgba(209, 203, 255, 0.18);
+      --panel: rgba(137, 144, 187, 0.24);
+      --panel-strong: rgba(137, 144, 187, 0.46);
+      --header-bg: #8990BB;
+      --header-edge: rgba(255, 255, 255, 0.12);
+      --shadow: rgba(72, 62, 111, 0.18);
+      --button-bg: rgba(216, 219, 245, 0.92);
+      --button-fg: #3d4351;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      padding: 0;
+    }
+
+    .page {
+      width: 100%;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .header {
+      position: absolute;
+      inset: 0 0 auto 0;
+      z-index: 3;
+      pointer-events: auto;
+    }
+
+    .header-panel {
+      position: relative;
+      min-height: clamp(138px, 19vh, 184px);
+      padding: 24px 28px 10px;
+      overflow: visible;
+      pointer-events: auto;
+    }
+
+    .header-blur {
+      display: none;
+    }
+
+    .headline {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 52px;
+    }
+
+    a,
+    button {
+      color: var(--fg);
+      font: inherit;
+      font-size: clamp(16px, 1.5vw, 22px);
+      font-weight: 300;
+      text-decoration: none;
+      text-shadow: 0 1px 10px rgba(28, 26, 48, 0.22);
+    }
+
+    a:hover,
+    a:focus-visible,
+    button:hover,
+    button:focus-visible {
+      opacity: 0.72;
+      outline: none;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(38px, 4.8vw, 64px);
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      line-height: 0.94;
+      text-shadow: 0 2px 18px rgba(28, 26, 48, 0.24);
+    }
+
+    .infinity-link {
+      position: absolute;
+      top: 24px;
+      right: 28px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--fg);
+      text-decoration: none;
+      pointer-events: auto;
+    }
+
+    .infinity-link:hover,
+    .infinity-link:focus-visible {
+      opacity: 0.72;
+      outline: none;
+    }
+
+    .infinity-link svg {
+      width: clamp(52px, 5.6vw, 84px);
+      height: clamp(28px, 2.8vw, 40px);
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 2px 18px rgba(28, 26, 48, 0.24));
+    }
+
+    .viewer {
+      position: absolute;
+      top: 132px;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0 24px 0 0;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+      gap: 20px;
+      pointer-events: auto;
+    }
+
+    .work-shell,
+    .side-panel {
+      min-height: 0;
+    }
+
+    .work-shell {
+      position: relative;
+      height: 100vh;
+      align-self: start;
+      overflow: hidden;
+    }
+
+    .art-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0f1534;
+    }
+
+    .frame-fallback {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 21, 52, 0.74);
+      color: rgba(234, 238, 255, 0.82);
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .side-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      margin-top: 160px;
+      max-height: calc(100vh - 160px);
+      padding: 0;
+      gap: 28px;
+      overflow: auto;
+      scrollbar-width: none;
+    }
+
+    .side-panel::-webkit-scrollbar {
+      display: none;
+    }
+
+    .control-group {
+      display: grid;
+      gap: 12px;
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .params-title {
+      font-size: clamp(15px, 1.1vw, 18px);
+      letter-spacing: -0.03em;
+      line-height: 1.08;
+      opacity: 0.92;
+    }
+
+    .icon-button,
+    .collect-button {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .icon-button {
+      width: 48px;
+      height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 999px;
+    }
+
+    .icon-button svg {
+      width: 24px;
+      height: 24px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.85;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .collect-button {
+      min-width: 180px;
+      height: 48px;
+      padding: 0 24px;
+      background: rgba(234, 238, 255, 0.2);
+      color: rgb(196, 201, 223);
+      font-size: clamp(19px, 1.55vw, 24px);
+      border-radius: 999px;
+      text-shadow: none;
+      backdrop-filter: blur(18px) saturate(120%);
+      -webkit-backdrop-filter: blur(18px) saturate(120%);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.38),
+        0 10px 24px rgba(39, 41, 66, 0.12);
+      flex: 1 1 auto;
+      text-align: center;
+    }
+
+    .collect-button:hover,
+    .collect-button:focus-visible {
+      opacity: 0.96;
+      background: rgba(239, 242, 255, 0.28);
+    }
+
+    .control-surface,
+    .params-panel {
+      padding: 18px 0 0;
+      background: transparent;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      box-shadow: none;
+    }
+
+    .params-panel {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+      margin-top: 10px;
+    }
+
+    .verse-panel {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .verse-status {
+      font-size: 13px;
+      line-height: 1.4;
+      opacity: 0.82;
+    }
+
+    .sale-status {
+      font-size: 13px;
+      line-height: 1.45;
+      opacity: 0.9;
+      color: rgba(215, 220, 245, 0.9);
+    }
+
+    .verse-links {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .verse-links a {
+      font-size: 14px;
+      opacity: 0.86;
+    }
+
+    .params-list {
+      display: grid;
+      gap: 10px;
+      background: transparent;
+    }
+
+    .param-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 0.9fr) minmax(0, 1.1fr);
+      gap: 12px;
+      padding: 0;
+      background: transparent;
+    }
+
+    .param-key {
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      opacity: 0.68;
+    }
+
+    .param-value {
+      font-size: 15px;
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    @media (max-width: 720px) {
+      .header-panel {
+        min-height: 124px;
+        padding: 14px 14px 24px;
+      }
+
+      .headline {
+        margin-bottom: 0;
+      }
+
+      .infinity-link {
+        top: 14px;
+        right: 14px;
+      }
+
+      .overlay {
+        inset: 0 12px 0 0;
+        grid-template-columns: 1fr;
+        grid-template-rows: 100vh minmax(0, 1fr);
+      }
+
+      .side-panel {
+        margin-top: 148px;
+        max-height: calc(100vh - 148px);
+        padding: 0;
+      }
+
+      .collect-button {
+        min-width: 0;
+        flex: 1 1 auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="header-panel">
+        <div class="header-blur" aria-hidden="true"></div>
+        <div class="headline">
+          <h1>Collect ∞</h1>
+        </div>
+        <a href="index.html" class="infinity-link" aria-label="Back to index">
+          <svg viewBox="0 0 40 24" aria-hidden="true">
+            <path d="M37 12H6"/>
+            <path d="M13 19 6 12l7-7"/>
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <section class="viewer" aria-label="Окно работы для минта">
+      <div class="overlay">
+        <section class="work-shell" aria-label="Большое окно работы">
+          <iframe
+            class="art-frame"
+            id="collect-frame"
+            src="about:blank"
+            title="Soft Continuum ∞ collect view"
+            loading="eager"></iframe>
+          <div class="frame-fallback" id="frame-fallback">
+            External Verse artwork could not be embedded here. Open the release on Verse in a new tab.
+          </div>
+        </section>
+
+        <aside class="side-panel" aria-label="Панель минта">
+          <section class="control-surface control-group">
+            <div class="action-row">
+              <button type="button" id="reload-work" class="icon-button" aria-label="Reload work">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M20 11a8 8 0 1 1-2.34-5.66"/>
+                  <path d="M20 4v5h-5"/>
+                </svg>
+              </button>
+              <button type="button" class="collect-button" id="collect-button">Collect on Verse</button>
+            </div>
+          </section>
+
+          <section class="params-panel">
+            <div class="params-title">Parameters</div>
+            <div class="params-list" id="params-list"></div>
+          </section>
+
+          <section class="verse-panel" aria-label="Verse sandbox controls">
+            <div class="params-title">Verse Sandbox</div>
+            <div class="verse-status" id="verse-status">Preparing purchase flow…</div>
+            <div class="sale-status" id="sale-status">Loading live sale status from Verse…</div>
+            <div class="verse-links">
+              <a id="verse-release-link" href="https://demo.verse.works/series/gen-project-test-by-mchx-test-acc" target="_blank" rel="noopener noreferrer">Open release on Verse</a>
+              <a href="verse-test.html">Open test console</a>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <script src="verse-shared.js"></script>
+  <script src="https://unpkg.com/verse-embedded@1.1.5/dist/verse-elements.js"></script>
+  <script>
+    const verseShared = window.SOFT_CONTINUUM_VERSE;
+    const frame = document.getElementById("collect-frame");
+    const frameFallback = document.getElementById("frame-fallback");
+    const reloadButton = document.getElementById("reload-work");
+    const collectButton = document.getElementById("collect-button");
+    const paramsList = document.getElementById("params-list");
+    const verseStatus = document.getElementById("verse-status");
+    const saleStatusNode = document.getElementById("sale-status");
+    const verseReleaseLink = document.getElementById("verse-release-link");
+    let elements = null;
+    let saleState = null;
+
+    const paletteModes = ["Pastel bandfield", "Soft dusk", "Amber bloom", "Mirror violet"];
+    const flowModes = ["Slow drift", "Cross-current", "Ribbon field", "Lateral bloom"];
+    const mirrorModes = ["Normal", "Mirror X"];
+    const layerModes = ["Persistent on", "Persistent off"];
+    const paramState = {
+      iteration: "#001",
+      seed: "0x92f0c7",
+      palette: paletteModes[0],
+      flow: flowModes[0],
+      mirror: mirrorModes[0],
+      maxIter: "12",
+      persistentLayer: layerModes[0]
+    };
+
+    function renderParams() {
+      paramsList.innerHTML = "";
+      const rows = [
+        ["Iteration", paramState.iteration],
+        ["Seed", paramState.seed],
+        ["Palette", paramState.palette],
+        ["Flow", paramState.flow]
+      ];
+
+      rows.forEach(([key, value]) => {
+        const row = document.createElement("div");
+        row.className = "param-row";
+        row.innerHTML = `
+          <div class="param-key">${key}</div>
+          <div class="param-value">${value}</div>
+        `;
+        paramsList.appendChild(row);
+      });
+    }
+
+    function randomHex(length) {
+      const chars = "0123456789abcdef";
+      let value = "";
+      for (let i = 0; i < length; i += 1) {
+        value += chars[Math.floor(Math.random() * chars.length)];
+      }
+      return value;
+    }
+
+    function refreshIterationParams() {
+      const number = Math.floor(Math.random() * 999) + 1;
+      paramState.iteration = `#${String(number).padStart(3, "0")}`;
+      paramState.seed = `0x${randomHex(6)}`;
+      paramState.palette = paletteModes[Math.floor(Math.random() * paletteModes.length)];
+      paramState.flow = flowModes[Math.floor(Math.random() * flowModes.length)];
+      paramState.mirror = mirrorModes[Math.floor(Math.random() * mirrorModes.length)];
+      paramState.maxIter = `${10 + Math.floor(Math.random() * 5)}`;
+      paramState.persistentLayer = layerModes[Math.floor(Math.random() * layerModes.length)];
+      renderParams();
+    }
+
+    function setVerseStatus(message, isError = false) {
+      verseStatus.textContent = message;
+      verseStatus.style.opacity = isError ? "1" : "0.82";
+      verseStatus.style.color = isError ? "rgb(225, 189, 197)" : "";
+    }
+
+    function syncVerseLinks() {
+      const verseConfig = verseShared.getConfig();
+      verseReleaseLink.href = verseConfig.artworkUrl;
+    }
+
+    function formatMoscowDate(isoString) {
+      if (!isoString) return null;
+      const date = new Date(isoString);
+      return new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Moscow",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(date);
+    }
+
+    function renderSaleStatus() {
+      if (!saleState) {
+        saleStatusNode.textContent = "Live sale status is unavailable right now.";
+        return;
+      }
+
+      const remaining = saleState.maxEditions - saleState.issuedEditions;
+      const startsAtMsk = formatMoscowDate(saleState.startsAt);
+      const startedAtMsk = formatMoscowDate(saleState.startedAt);
+
+      if (!saleState.startedAt && saleState.startsAt) {
+        saleStatusNode.textContent = `Sale has not started yet. Verse says it opens on ${startsAtMsk} MSK.`;
+        return;
+      }
+
+      saleStatusNode.textContent = `Live Verse status: ${saleState.issuedEditions}/${saleState.maxEditions} issued, ${remaining} remaining. Sale opened on ${startedAtMsk || startsAtMsk} MSK.`;
+    }
+
+    async function fetchSaleStatus() {
+      const verseConfig = verseShared.getConfig();
+      const response = await fetch(verseShared.SANDBOX_GRAPHQL_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          query: `
+            query CollectSaleStatus($artworkId: ArtworkID!) {
+              artworks(filter: { id: $artworkId }) {
+                id
+                primaryMarketListing {
+                  startsAt
+                  startedAt
+                  strategy {
+                    __typename
+                    ... on PMBuyNowLimitedEditionStrategy {
+                      maxEditions
+                      reservedEditions
+                      stats {
+                        issuedEditions
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `,
+          variables: {
+            artworkId: verseConfig.artworkId
+          }
+        })
+      });
+
+      const payload = await response.json();
+      const artwork = payload && payload.data && payload.data.artworks && payload.data.artworks[0];
+      const listing = artwork && artwork.primaryMarketListing;
+      const strategy = listing && listing.strategy;
+
+      if (!listing || !strategy || strategy.__typename !== "PMBuyNowLimitedEditionStrategy") {
+        throw new Error("Verse sale status is unavailable for this artwork.");
+      }
+
+      saleState = {
+        startsAt: listing.startsAt,
+        startedAt: listing.startedAt,
+        maxEditions: Number(strategy.maxEditions || 0),
+        reservedEditions: Number(strategy.reservedEditions || 0),
+        issuedEditions: Number((strategy.stats && strategy.stats.issuedEditions) || 0)
+      };
+
+      renderSaleStatus();
+    }
+
+    function loadVerseArtwork() {
+      const verseConfig = verseShared.getConfig();
+      frame.src = verseConfig.iframeUrl;
+      frameFallback.style.display = "none";
+    }
+
+    function initVerse() {
+      if (!window.VerseElements) {
+        setVerseStatus("Verse SDK failed to load.", true);
+        return;
+      }
+
+      elements = new window.VerseElements({
+        baseUrl: verseShared.SANDBOX_BASE_URL
+      });
+
+      syncVerseLinks();
+      loadVerseArtwork();
+      setVerseStatus("Sandbox purchase flow is ready on localhost.");
+      fetchSaleStatus().catch((error) => {
+        saleStatusNode.textContent = `Could not load live sale status: ${error.message}`;
+      });
+    }
+
+    function notifyArtworkResize() {
+      const innerWindow = frame.contentWindow;
+      if (!innerWindow) return;
+
+      try {
+        const frameUrl = new URL(frame.src, window.location.href);
+        if (frameUrl.origin !== window.location.origin) return;
+        innerWindow.dispatchEvent(new Event("resize"));
+      } catch (error) {
+        // Cross-origin iframes like Verse artwork previews cannot be poked directly.
+      }
+    }
+
+    const frameResizeObserver = new ResizeObserver(() => {
+      notifyArtworkResize();
+    });
+
+    frameResizeObserver.observe(frame);
+
+    frame.addEventListener("load", () => {
+      notifyArtworkResize();
+      requestAnimationFrame(() => notifyArtworkResize());
+      setTimeout(notifyArtworkResize, 120);
+    });
+
+    window.addEventListener("load", () => {
+      notifyArtworkResize();
+    });
+
+    reloadButton.addEventListener("click", () => {
+      const verseConfig = verseShared.getConfig();
+      frame.src = `${verseConfig.iframeUrl}?t=${Date.now()}`;
+      refreshIterationParams();
+    });
+
+    collectButton.addEventListener("click", () => {
+      if (!elements) {
+        setVerseStatus("Verse SDK is not ready yet.", true);
+        return;
+      }
+
+      const verseConfig = verseShared.getConfig();
+      if (!verseConfig.artworkId) {
+        setVerseStatus("Artwork ID is missing. Open the Verse test console first.", true);
+        return;
+      }
+
+      setVerseStatus("Opening Verse purchase dialog for a single edition.");
+
+      elements.openPurchaseDialog(
+        verseConfig.artworkId,
+        {},
+        {
+          onSuccess(result) {
+            const editionNumber = result && result.editionNumber
+              ? String(result.editionNumber)
+              : String(verseShared.getMints().length + 1).padStart(3, "0");
+            const activeConfig = verseShared.getConfig();
+            verseShared.addMint({
+              id: result && result.editionId ? result.editionId : `local-${Date.now()}`,
+              editionId: result && result.editionId ? result.editionId : null,
+              editionNumber,
+              mintedAt: new Date().toISOString().slice(0, 10),
+              collector: "Sandbox collector",
+              artworkUrl: activeConfig.artworkUrl,
+              iframeUrl: activeConfig.iframeUrl,
+              previewImageUrl: activeConfig.previewImageUrl,
+              title: activeConfig.artworkTitle,
+              artistName: activeConfig.artistName
+            });
+            setVerseStatus(`Purchase complete: ${JSON.stringify(result)}`);
+          },
+          onTerminalFailure(result) {
+            const liveHint = saleState
+              ? ` Live GraphQL status: ${saleState.issuedEditions}/${saleState.maxEditions} issued. Verse dialog decides the active sale.`
+              : "";
+            const message = result && result.message ? ` ${result.message}` : "";
+            setVerseStatus(`Purchase failed: ${result.title || "Unknown error"}.${message}${liveHint}`, true);
+          },
+          onClose() {
+            setVerseStatus("Purchase dialog closed.");
+          }
+        }
+      );
+    });
+
+    renderParams();
+    initVerse();
+
+    frame.addEventListener("error", () => {
+      frameFallback.style.display = "flex";
+    });
+  </script>
+</body>
+</html>

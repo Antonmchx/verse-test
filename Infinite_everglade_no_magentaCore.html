@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <title>Soft Continuum ∞</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f1534;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+  <script>
+    const canvas = document.getElementById("gl");
+    const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
+    if (!gl) throw new Error("WebGL not supported");
+    if ("drawingBufferColorSpace" in gl) gl.drawingBufferColorSpace = "display-p3";
+    const persistentColAALayerEnabled = Math.random() < 0.65;
+    const MAX_LAYERS = persistentColAALayerEnabled ? 5 : 4;
+    const DYNAMIC_LAYER_SLOTS = 1;
+
+    const vs = `
+      attribute vec2 a_pos;
+      void main() {
+        gl_Position = vec4(a_pos, 0., 1.);
+      }
+    `;
+
+    const fs = `
+      precision highp float;
+      uniform vec2 u_res;
+      uniform float u_time;
+      uniform float u_TAU;
+      uniform int u_MAX_ITER;
+      uniform float u_cX;
+      uniform float u_cY;
+      uniform float u_coYh;
+      uniform float u_coXh;
+      uniform float u_timeLead;
+      uniform float u_paletteAxisMode;
+      uniform float u_colAAMirrorMode;
+      uniform float u_flowOffset;
+      uniform float u_edgeSoftMode;
+      uniform int u_colAAPhase;
+      const int MAX_LAYERS = ${MAX_LAYERS};
+      uniform vec4 u_layers[MAX_LAYERS];
+      uniform vec4 u_layerColors[MAX_LAYERS];
+      uniform vec2 u_layerParams[MAX_LAYERS];
+      uniform vec4 u_staticShapeParams[1];
+      uniform vec3 u_staticCols[17];
+
+      vec3 palette( in float t )
+{
+    vec3 a, b, c, d;
+    a = vec3(.6176, .478, .3157);
+    b = vec3(.151, .1349, .255);
+    c = vec3(.8471, .7176, .9882);
+    d = vec3(.642, .442, .667);
+    return a + b*cos( 6.28318*(c*t+d) );
+}
+
+      float blob(vec2 uv, vec2 c, vec2 r, float k) {
+        vec2 p;
+        p = (uv - c) / r;
+        return exp(-dot(p, p) * k);
+      }
+
+      void main() {
+        vec2 uv, colAAUv, xy, xy2, uvDiag, uvs, p, i, wxy;
+        vec2 dynamicLayerCenterSum, staticCenterSum, luv, dynamicLayerCenter, layerColAACenter;
+        vec2 staticColAACenter, colAACenter, bridgeCenter, uvSideL, uvSideR;
+        vec3 c1, c2, c22, c3, bg1, cd, cm, cmix, cmixA, cmix0, colAA, col;
+        vec3 dynamicLayerColorSum, staticColAASum, dynamicLayerColor, layerColAAColor;
+        vec3 dynamicColAA, fusedColAA, sideLayerCol;
+        vec4 pinkPlateShape, L;
+        float time, c, inten, cX, cY, t, paletteAxisTerm, coYh, coXh, delta, h00, h;
+        float deepTop, topBlueVoid, topRightWine, dynamicLayerInfluence, staticColAAInfluence;
+        float ph, m, a, link, pinkPlate, dynamicLinkN, linkN, phaseT, colAAW, colAAH;
+        float colAAMask, bridgeAnchorX, colAAStem, dynamicPenetration, sideWave, sideWidth;
+        float leftStripeX, rightStripeX, stripeYL, stripeYR, stripeBlueMix, leftSideLayer;
+        float rightSideLayer, leftSoftLayer, rightSoftLayer, lowerSideFade, cornerL, cornerR;
+        float centerSat, satLuma;
+
+        // Normalized screen-space coordinates used by all masks and fields.
+        uv = gl_FragCoord.xy / u_res.xy;
+        colAAUv = uv;
+        if (u_colAAMirrorMode > .5) {
+          colAAUv.x = 1. - colAAUv.x;
+        }
+        xy = colAAUv;
+        xy2 = colAAUv;
+        uvDiag = uv;
+        uvDiag.y += sin(uv.x * 5.6 + .8) * .02;
+
+        time = u_time * .05 + 10.;
+        uvs = colAAUv;
+        #ifdef SHOW_TILING
+        p = mod(uvs * u_TAU * 2., u_TAU) - 150.;
+        #else
+        p = mod(uvs * u_TAU, u_TAU) - u_flowOffset;
+        #endif
+        i = vec2(p);
+        c = 1.;
+        inten = .005;
+
+        cX = u_cX;
+        cY = u_cY;
+
+        for (int n = 0; n < 15; n++) {
+          if (n >= u_MAX_ITER) break;
+          t = u_timeLead + time * (1. - (.5 / float(n + 1)));
+          i = p + vec2(
+            cos(t - i.x) + sin(t + i.y*cX), //множители
+            sin(t - i.y) + cos(t + i.x*cY)
+          );
+          c += 1.0 / length(vec2(
+            p.x / (sin(i.x + t) / inten),
+            p.y / (cos(i.y + t) / inten)
+          ));
+        }
+        c /= float(u_MAX_ITER);
+        c = 1.17 - pow(c, 1.4);
+
+        c1 = vec3(.01071, .086, .0109);
+        paletteAxisTerm = .0;
+        if (u_paletteAxisMode < .5) {
+          paletteAxisTerm = .5 * xy.y;
+        } else if (u_paletteAxisMode < 1.5) {
+          paletteAxisTerm = .5 * xy.x;
+        }
+        c2 = palette(paletteAxisTerm + u_time * .05);
+        c22 = palette(.015);
+        c3 = vec3(.412, .235, .63);
+
+        c22 = mix(c22, c2, sin(xy.y + u_time * .25));
+
+        bg1 = c1;
+        cd = c2;
+        cm = c22;
+
+        coYh = u_coYh;
+        coXh = u_coXh;
+        delta = sin(u_time * .015) + 1. / 2.;
+wxy = xy2;
+wxy.x += .08 * sin(xy2.y * 8. + u_time * .27);
+wxy.y += .06 * cos(xy2.x * 6. + u_time * .15);
+
+h00 = cos((coYh + delta) * wxy.y * c) + sin((coXh-delta) * wxy.x * c);
+h = .075;
+
+cmix = mix(bg1, cm, xy.x / h);
+cmixA = mix(cd, bg1, xy.x);
+cmix0 = mix(cmix, cmixA, (xy.x - h) / (1. - h));
+colAA = mix(
+          mix(c3, cmix0, xy.y / h00),
+          mix(cmix0, c1, (xy.y - h00) / (1. - h00)),
+          step(h00, xy.y)
+        );
+
+col = u_staticCols[0];
+deepTop = blob(uv, vec2(.5, .56), vec2(.86, .76), 3.2);
+col = mix(col, u_staticCols[1], deepTop * .88);
+
+topBlueVoid = blob(uv, vec2(.92, .6), vec2(.42, .27), 3.4);
+col = mix(col, u_staticCols[2], topBlueVoid * .82);
+
+topRightWine = blob(uv, vec2(.78, .68), vec2(.3, .22), .2);
+col = mix(col, u_staticCols[3], topRightWine * .48);
+
+pinkPlateShape = u_staticShapeParams[0];
+
+dynamicLayerColorSum = vec3(0.);
+dynamicLayerCenterSum = vec2(0.);
+dynamicLayerInfluence = 0.;
+staticColAAInfluence = 0.;
+staticColAASum = vec3(0.);
+staticCenterSum = vec2(0.);
+
+for (int i = 0; i < MAX_LAYERS; i++) {
+          L = u_layers[i];
+          if (L.z <= .0 || L.w <= .0) continue;
+          luv = uvDiag;
+          ph = u_layerParams[i].y;
+          luv.y += sin((uv.x + ph) * 8.8) * .01 + sin((uv.x * 1.9 - ph) * 13.) * .004;
+          m = blob(luv, L.xy, L.zw, u_layerParams[i].x);
+          a = clamp(m * u_layerColors[i].a, 0., 1.);
+          col = mix(col, u_layerColors[i].rgb, a * .84);
+
+          link = m * u_layerColors[i].a;
+          dynamicLayerInfluence += link;
+          dynamicLayerColorSum += u_layerColors[i].rgb * link;
+          dynamicLayerCenterSum += L.xy * link;
+        }
+        
+
+pinkPlate = blob(uv, pinkPlateShape.xy, pinkPlateShape.zw, 1.6);
+col = mix(col, u_staticCols[11], pinkPlate * .84);
+staticColAAInfluence += pinkPlate * .84;
+staticColAASum += u_staticCols[11] * (pinkPlate * .84);
+staticCenterSum += pinkPlateShape.xy * (pinkPlate * .84);
+
+dynamicLinkN = smoothstep(.02, .75, dynamicLayerInfluence);
+dynamicLayerColor = dynamicLayerColorSum / (dynamicLayerInfluence + .0001);
+dynamicLayerCenter = dynamicLayerCenterSum / (dynamicLayerInfluence + .0001);
+linkN = smoothstep(.02, .9, staticColAAInfluence);
+layerColAAColor = staticColAASum / (staticColAAInfluence + .0001);
+layerColAACenter = staticCenterSum / (staticColAAInfluence + .0001);
+dynamicColAA = mix(colAA, layerColAAColor, .56 * linkN);
+dynamicColAA = mix(dynamicColAA, dynamicLayerColor, .12 * dynamicLinkN);
+
+
+        phaseT = (sin(u_time * .16) + 1.) * .5;
+        colAAW = mix(.72, .48, phaseT);
+        colAAH = mix(.34, .22, phaseT);
+        if (u_colAAPhase == 2) {
+          colAAW = mix(.64, .44, phaseT);
+          colAAH = mix(.38, .24, phaseT);
+        } else if (u_colAAPhase == 3) {
+          colAAW = mix(.8, .56, phaseT);
+          colAAH = mix(.28, .18, phaseT);
+        } else if (u_colAAPhase == 4) {
+          colAAW = mix(.58, .4, phaseT);
+          colAAH = mix(.42, .28, phaseT);
+        }
+
+        staticColAACenter = mix(vec2(.52, .26 + delta * .08), layerColAACenter, .78 * linkN);
+        colAACenter = mix(staticColAACenter, dynamicLayerCenter, .16 * dynamicLinkN);
+        if (u_colAAMirrorMode > .5) {
+          colAACenter.x = 1. - colAACenter.x;
+        }
+        colAAMask = blob(uv, colAACenter, vec2(colAAW, colAAH), 2.6);
+        bridgeAnchorX = u_colAAMirrorMode > .5 ? .48 : .52;
+        bridgeCenter = vec2(mix(bridgeAnchorX, colAACenter.x, .5), mix(.38, colAACenter.y, .55));
+        colAAStem = blob(uv, bridgeCenter, vec2(.2, .28), 1.8);
+        dynamicPenetration = smoothstep(.08, .9, colAAStem * linkN + colAAMask * .65);
+
+        col = mix(col, dynamicColAA, .28 + colAAMask * (.52 + .42 * linkN));
+        fusedColAA = mix(dynamicColAA, layerColAAColor, .32 + .24 * linkN);
+        col = mix(col, fusedColAA, dynamicPenetration * .62);
+
+        t = u_time * .22;
+        sideWave = .12 + .012 * sin(t * 1.2);
+        uvSideL = uv;
+        uvSideR = uv;
+        uvSideL.y += smoothstep(.55, 0., uv.x) * sideWave + .008 * sin(t * 1.5 + uv.x * 6.);
+        uvSideR.y -= smoothstep(.45, 1., uv.x) * sideWave + .008 * sin(t * 1.5 + (1. - uv.x) * 6.);
+
+        sideWidth = mix(0.070, 0.105, u_edgeSoftMode);
+        leftStripeX = 1.0 - smoothstep(.01, sideWidth, uv.x);
+        rightStripeX = smoothstep(1. - sideWidth - .04, 1., uv.x);
+        stripeYL = 1.0 - smoothstep(.04, .25, uvSideL.y);
+        stripeYR = 1.0 - smoothstep(.04, .25, uvSideR.y);
+        stripeBlueMix = smoothstep(.57, .605, uv.y);
+        sideLayerCol = mix(u_staticCols[15], u_staticCols[9], stripeBlueMix);
+        leftSideLayer = leftStripeX * stripeYL;
+        rightSideLayer = rightStripeX * stripeYR;
+        col = mix(col, sideLayerCol, leftSideLayer * .58);
+        col = mix(col, sideLayerCol, rightSideLayer * .58);
+
+        leftSoftLayer = blob(uvSideL, vec2(.02, .32), vec2(.24, .4), 3.6);
+        rightSoftLayer = blob(uvSideR, vec2(1., .33), vec2(.36, .52), 2.05);
+        lowerSideFade = 1. - smoothstep(.44, .545, uv.y);
+        col = mix(col, sideLayerCol, leftSoftLayer * lowerSideFade * .3);
+        col = mix(col, sideLayerCol, rightSoftLayer * lowerSideFade * .34);
+
+        cornerL = blob(uv, vec2(.08, .07), vec2(.22, .15), 2.);
+        cornerR = blob(uv, vec2(.92, .07), vec2(.22, .15), 2.);
+        col = mix(col, sideLayerCol, cornerL * .16);
+        col = mix(col, sideLayerCol, cornerR * .16);
+
+
+        centerSat = blob(uv, vec2(.50, .47), vec2(.44, .24), 1.8);
+        satLuma = dot(col, vec3(.2126, .7152, .0722));
+        col = mix(vec3(satLuma), col, 1.1 + centerSat * .18);
+        col = pow(clamp(col, 0., 1.), vec3(.93)); //1.2
+
+        gl_FragColor = vec4(col, 1.);
+      }
+    `;
+
+    function compile(type, src) {
+      const sh = gl.createShader(type);
+      gl.shaderSource(sh, src);
+      gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+        throw new Error(gl.getShaderInfoLog(sh));
+      }
+      return sh;
+    }
+
+    const prg = gl.createProgram();
+    gl.attachShader(prg, compile(gl.VERTEX_SHADER, vs));
+    gl.attachShader(prg, compile(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prg);
+    if (!gl.getProgramParameter(prg, gl.LINK_STATUS)) {
+      throw new Error(gl.getProgramInfoLog(prg));
+    }
+    gl.useProgram(prg);
+
+    const quad = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW
+    );
+
+    const aPos = gl.getAttribLocation(prg, "a_pos");
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+    const uRes = gl.getUniformLocation(prg, "u_res");
+    const uTime = gl.getUniformLocation(prg, "u_time");
+    const uTAU = gl.getUniformLocation(prg, "u_TAU");
+    const uMaxIter = gl.getUniformLocation(prg, "u_MAX_ITER");
+    const uCX = gl.getUniformLocation(prg, "u_cX");
+    const uCY = gl.getUniformLocation(prg, "u_cY");
+    const uCoYh = gl.getUniformLocation(prg, "u_coYh");
+    const uCoXh = gl.getUniformLocation(prg, "u_coXh");
+    const uTimeLead = gl.getUniformLocation(prg, "u_timeLead");
+    const uPaletteAxisMode = gl.getUniformLocation(prg, "u_paletteAxisMode");
+    const uColAAMirrorMode = gl.getUniformLocation(prg, "u_colAAMirrorMode");
+    const uFlowOffset = gl.getUniformLocation(prg, "u_flowOffset");
+    const uLayers = gl.getUniformLocation(prg, "u_layers");
+    const uLayerColors = gl.getUniformLocation(prg, "u_layerColors");
+    const uLayerParams = gl.getUniformLocation(prg, "u_layerParams");
+    const uStaticShapeParams = gl.getUniformLocation(prg, "u_staticShapeParams");
+    const uStaticCols = gl.getUniformLocation(prg, "u_staticCols[0]");
+    const uEdgeSoftMode = gl.getUniformLocation(prg, "u_edgeSoftMode");
+    const uColAAPhase = gl.getUniformLocation(prg, "u_colAAPhase");
+
+    function hexToRgb01(hex) {
+      const s = hex.replace("#", "");
+      const n = parseInt(s, 16);
+      return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+    }
+
+    // Palette A: current (original ref7 split)
+    const paletteA = {
+      staticDark: [
+        hexToRgb01("#070a25"),
+        hexToRgb01("#0b0b37"),
+        hexToRgb01("#17123d"),
+        hexToRgb01("#151947"),
+        hexToRgb01("#878cd1"),
+        hexToRgb01("#1e1f31")
+      ],
+      staticLight: [
+        hexToRgb01("#3d8ffa"),
+        hexToRgb01("#a3ebc7"),
+        hexToRgb01("#0dd1eb"),
+        hexToRgb01("#0dd6c7"),
+        hexToRgb01("#d1dbf2"),
+        hexToRgb01("#dbd825")
+      ]
+    };
+
+    // Palette B: alternate static palette.
+    const paletteB = {
+      staticDark: [
+        hexToRgb01("#080f3b"),
+        hexToRgb01("#140d47"),
+        hexToRgb01("#33054d"),
+        hexToRgb01("#551146"),
+        hexToRgb01("#227086"),
+        hexToRgb01("#9e1c59"),
+        hexToRgb01("#142673")
+      ],
+      staticLight: [
+        hexToRgb01("#72126d"),
+        hexToRgb01("#5766d4"),
+        hexToRgb01("#e55d48"),
+        hexToRgb01("#d65cc7"),
+        hexToRgb01("#14c2e6"),
+        hexToRgb01("#dee6ed")
+      ]
+    };
+
+    // Palette C: from ref9_pastel_bandfield_noglow
+    const paletteC = {
+      staticDark: [
+        [0.11, 0.20, 0.56],
+        [0.44, 0.18, 0.72],
+        [0.05, 0.06, 0.42],
+        [0.06, 0.22, 0.74],
+        [0.06, 0.20, 0.72],
+        [0.70, 0.78, 0.92]
+      ],
+      staticLight: [
+        [0.74, 0.66, 0.82],
+        [0.86, 0.72, 0.80],
+        [0.95, 0.52, 0.33],
+        [0.92, 0.66, 0.54],
+        [0.12, 0.90, 0.90],
+        [0.10, 0.89, 0.88]
+      ]
+    };
+
+    const paletteD = {
+      staticDark: [
+        hexToRgb01("#11122d"),
+        hexToRgb01("#0b1338"),
+        hexToRgb01("#1b1f61"),
+        hexToRgb01("#171e7c"),
+        hexToRgb01("#3843d6"),
+        hexToRgb01("#e3442b")
+      ],
+      staticLight: [
+        hexToRgb01("#309edd"),
+        hexToRgb01("#8eedf7"),
+        hexToRgb01("#2cb7e6"),
+        hexToRgb01("#1668e2"),
+        hexToRgb01("#0b5aba"),
+        hexToRgb01("#bf2180")
+      ]
+    };
+
+    const paletteE = {
+      staticDark: [
+        hexToRgb01("#15020b"),
+        hexToRgb01("#c13d11"),
+        hexToRgb01("#10052B"),
+        hexToRgb01("#3a0515"),
+        hexToRgb01("#060c30"),
+        hexToRgb01("#041810"),
+        hexToRgb01("#a2a19e")
+      ],
+      staticLight: [
+        hexToRgb01("#9c1051"),
+        hexToRgb01("#ac3811"),
+        hexToRgb01("#c04b15"),
+        hexToRgb01("#BAB2AD"),
+        hexToRgb01("#3247c9"),
+        hexToRgb01("#48b98a"),
+        hexToRgb01("#e4ad21"),
+        hexToRgb01("#E0E012")
+      ]
+    };
+
+    const paletteF = {
+      staticDark: [
+        hexToRgb01("#d5d6d7"),
+        hexToRgb01("#c1c5c7"),
+        hexToRgb01("#889196"),
+        hexToRgb01("#6a757d"),
+        hexToRgb01("#5f6f7a"),
+        hexToRgb01("#333f48"),
+        hexToRgb01("#1a1f23")
+      ],
+      staticLight: [
+        hexToRgb01("#081b2e"),
+        hexToRgb01("#27a6e6"),
+        hexToRgb01("#e88311"),
+        hexToRgb01("#22cd63"),
+        hexToRgb01("#e0e9ee"),
+        hexToRgb01("#6919e9"),
+        hexToRgb01("#e41111"),
+        hexToRgb01("#16DCB8")
+      ]
+    };
+
+    const paletteG = {
+      staticDark: [
+        hexToRgb01("#050e3b"),
+        hexToRgb01("#081c44"),
+        hexToRgb01("#092861"),
+        hexToRgb01("#083c4f"),
+        hexToRgb01("#092b2d"),
+        hexToRgb01("#163658"),
+        hexToRgb01("#061f39"),
+        hexToRgb01("#D7DFE6"),
+        hexToRgb01("#E26EB5")
+      ],
+      staticLight: [
+        hexToRgb01("#e9b814"),
+        hexToRgb01("#d48d24"),
+        hexToRgb01("#225bab"),
+        hexToRgb01("#1171d9"),
+        hexToRgb01("#a6ceeb"),
+        hexToRgb01("#28a7a3"),
+        hexToRgb01("#3cb07e"),
+        hexToRgb01("#D7DFE6"),
+        hexToRgb01("#E26EB5")
+      ]
+    };
+
+    const paletteH = {
+      staticDark: [
+        hexToRgb01("#589cd0"),
+        hexToRgb01("#dc7955"),
+        hexToRgb01("#0a1e39"),
+        hexToRgb01("#0f1c1d"),
+        hexToRgb01("#7a322d"),
+        hexToRgb01("#4a2727"),
+        hexToRgb01("#331d1d"),
+        hexToRgb01("#2b1c1c")
+      ],
+      staticLight: [
+        hexToRgb01("#4f9cc2"),
+        hexToRgb01("#eb8c60"),
+        hexToRgb01("#cbbbc0"),
+        hexToRgb01("#efd4c9"),
+        hexToRgb01("#e08d87"),
+        hexToRgb01("#c66061"),
+        hexToRgb01("#ab323a"),
+        hexToRgb01("#331d1d")
+      ]
+    };
+
+     const paletteModes = ["A","B","C","D","E","F","G","H"];
+    const paletteMode = paletteModes[Math.floor(Math.random() * paletteModes.length)];
+    const paletteMap = { A: paletteA, B: paletteB, C: paletteC, D: paletteD, E: paletteE, F: paletteF, G: paletteG, H: paletteH };
+    const activePalette = paletteMap[paletteMode];
+    const paletteDark = activePalette.staticDark;
+    const paletteLight = activePalette.staticLight;
+    const staticFullPalette = [...activePalette.staticDark, ...activePalette.staticLight];
+    const staticDarkPalette = activePalette.staticDark;
+    const staticLightPalette = activePalette.staticLight;
+    const flowMode = Math.random() < 0.5 ? "downflow" : "upflow";
+    const dynamicColorMode = Math.random() < 0.5 ? "topDark" : "topLight";
+    const staticColorModes = ["topDark", "topLight", "random60Dark", "random90Dark", "randomAll"];
+    const staticColorMode = staticColorModes[Math.floor(Math.random() * staticColorModes.length)];
+    const colAAPhase = Math.floor(Math.random() * 4) + 1;
+     const renderModes = ["A", "B", "C", "D","E"];
+    //const renderModes = ["E"];
+    const renderMode = renderModes[Math.floor(Math.random() * renderModes.length)];
+
+    function createDeckPicker(colors, maxRepeat = 4) {
+      let deck = [];
+      function refill() {
+        deck = [];
+        for (let i = 0; i < colors.length; i++) {
+          for (let r = 0; r < maxRepeat; r++) deck.push(colors[i]);
+        }
+      }
+      refill();
+      return function pick() {
+        if (deck.length === 0) refill();
+        const idx = Math.floor(Math.random() * deck.length);
+        const c = deck[idx];
+        deck.splice(idx, 1);
+        return c;
+      };
+    }
+
+    function shouldUseDarkByY(yNorm, mode) {
+      if (mode === "topDark") return yNorm > 0.5;
+      return yNorm < 0.5;
+    }
+
+    const pickStaticDark = createDeckPicker(staticDarkPalette, 4);
+    const pickStaticLight = createDeckPicker(staticLightPalette, 4);
+    const pickStaticAny = createDeckPicker(staticFullPalette, 4);
+    // Extra-variation pickers for topDark/topLight modes.
+    const pickStaticDarkVar = createDeckPicker(staticDarkPalette, 1);
+    const pickStaticLightVar = createDeckPicker(staticLightPalette, 1);
+    const pickDynamicDark = createDeckPicker(paletteDark, 4);
+    const pickDynamicLight = createDeckPicker(paletteLight, 4);
+    function pickStaticColor(isDark) {
+      return isDark ? pickStaticDark() : pickStaticLight();
+    }
+
+    function pickDynamicColor(isDark) {
+      return isDark ? pickDynamicDark() : pickDynamicLight();
+    }
+
+    function rand(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function pickSteppedValue(min, max, step) {
+      const count = Math.floor((max - min) / step) + 1;
+      return min + Math.floor(Math.random() * count) * step;
+    }
+
+    function smoothstep01(edge0, edge1, x) {
+      const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+      return t * t * (3 - 2 * t);
+    }
+
+    function tintedColor(base, spread = 0.05) {
+      return [
+        Math.min(1, Math.max(0, base[0] + rand(-spread, spread))),
+        Math.min(1, Math.max(0, base[1] + rand(-spread, spread))),
+        Math.min(1, Math.max(0, base[2] + rand(-spread, spread)))
+      ];
+    }
+
+    function pickDynamicColorByY(yNorm) {
+      const colorBase = pickDynamicColor(shouldUseDarkByY(yNorm, dynamicColorMode));
+      return tintedColor(colorBase, 0.06);
+    }
+
+    function pickStaticPaletteColor() {
+      const color = staticFullPalette[Math.floor(Math.random() * staticFullPalette.length)];
+      return [color[0], color[1], color[2]];
+    }
+
+    function getStaticColor(index) {
+      const base = index * 3;
+      return [staticCols[base], staticCols[base + 1], staticCols[base + 2]];
+    }
+
+    function setStaticColor(index, color) {
+      const base = index * 3;
+      staticCols[base] = color[0];
+      staticCols[base + 1] = color[1];
+      staticCols[base + 2] = color[2];
+    }
+
+    function buildStaticRecolorOrder() {
+      const order = Array.from({ length: STATIC_COLS_COUNT }, (_, index) => index);
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      return order;
+    }
+
+    function createStaticShape(cx, cy, rx, ry, jitter) {
+      return [
+        Math.min(0.92, Math.max(0.08, cx + rand(-jitter.cx, jitter.cx))),
+        Math.min(0.92, Math.max(0.08, cy + rand(-jitter.cy, jitter.cy))),
+        Math.max(0.08, rx * rand(jitter.rxMin, jitter.rxMax)),
+        Math.max(0.08, ry * rand(jitter.ryMin, jitter.ryMax))
+      ];
+    }
+
+    const STATIC_COLS_COUNT = 17;
+    const staticY = [
+      0.50, // base
+      0.90, // deepTop
+      0.78, // topBlueVoid
+      0.80, // topRightWine
+      0.56, // diagonalViolet
+      0.66, // upperCloud upA
+      0.66, // upperCloud upB
+      0.66, // upperCloud upC
+      0.66, // upperCloud upD
+      0.48, // midBluePatch
+      0.36, // magentaCore
+      0.30, // pinkPlate
+      0.16, // lowerMagenta
+      0.10, // lowerBlueBlend
+      0.50, // border tint
+      0.20, // sideCyanL
+      0.20  // sideCyanR
+    ];
+    const staticCols = new Float32Array(STATIC_COLS_COUNT * 3);
+    for (let i = 0; i < STATIC_COLS_COUNT; i++) {
+      let c;
+      if (staticColorMode === "random60Dark") {
+        c = pickStaticColor(Math.random() < 0.60);
+      } else if (staticColorMode === "random90Dark") {
+        c = pickStaticColor(Math.random() < 0.90);
+      } else if (staticColorMode === "randomAll") {
+        c = pickStaticAny();
+      } else {
+        // In topDark/topLight keep vertical intent but mix opposite pool for color variety.
+        const primaryDark = shouldUseDarkByY(staticY[i], staticColorMode);
+        const darkProb = primaryDark ? 0.65 : 0.35;
+        const useDark = Math.random() < darkProb;
+        c = useDark ? pickStaticDarkVar() : pickStaticLightVar();
+      }
+      staticCols[i * 3] = c[0];
+      staticCols[i * 3 + 1] = c[1];
+      staticCols[i * 3 + 2] = c[2];
+    }
+    // Keep side accents visible in the directional modes, but allow full palette
+    // randomness when the dedicated randomAll mode is active.
+    const sideLeftColor = staticColorMode === "randomAll" ? pickStaticAny() : pickStaticLight();
+    const sideRightColor = staticColorMode === "randomAll" ? pickStaticAny() : pickStaticLight();
+    staticCols[15 * 3] = sideLeftColor[0];
+    staticCols[15 * 3 + 1] = sideLeftColor[1];
+    staticCols[15 * 3 + 2] = sideLeftColor[2];
+    staticCols[16 * 3] = sideRightColor[0];
+    staticCols[16 * 3 + 1] = sideRightColor[1];
+    staticCols[16 * 3 + 2] = sideRightColor[2];
+
+    const STATIC_RECOLOR_DELAY = 60.0;
+    const STATIC_RECOLOR_DURATION = 20.0;
+    const staticRecolorState = {
+      activeIndex: -1,
+      order: buildStaticRecolorOrder(),
+      orderCursor: 0,
+      transitionStart: 0.0,
+      fromColor: [0, 0, 0],
+      toColor: [0, 0, 0]
+    };
+
+    function startNextStaticRecolor(now) {
+      if (staticRecolorState.orderCursor >= staticRecolorState.order.length) {
+        staticRecolorState.order = buildStaticRecolorOrder();
+        staticRecolorState.orderCursor = 0;
+      }
+
+      const index = staticRecolorState.order[staticRecolorState.orderCursor++];
+      let targetColor = pickStaticPaletteColor();
+      const currentColor = getStaticColor(index);
+
+      for (let tries = 0; tries < 6; tries++) {
+        const diff =
+          Math.abs(targetColor[0] - currentColor[0]) +
+          Math.abs(targetColor[1] - currentColor[1]) +
+          Math.abs(targetColor[2] - currentColor[2]);
+        if (diff > 0.08) break;
+        targetColor = pickStaticPaletteColor();
+      }
+
+      staticRecolorState.activeIndex = index;
+      staticRecolorState.transitionStart = now;
+      staticRecolorState.fromColor = currentColor;
+      staticRecolorState.toColor = targetColor;
+    }
+
+    function updateStaticRecolor(now) {
+      if (now < STATIC_RECOLOR_DELAY) return;
+
+      if (staticRecolorState.activeIndex === -1) {
+        startNextStaticRecolor(now);
+      }
+
+      const elapsed = now - staticRecolorState.transitionStart;
+      const mixT = Math.min(1.0, elapsed / STATIC_RECOLOR_DURATION);
+      const index = staticRecolorState.activeIndex;
+      const color = [
+        staticRecolorState.fromColor[0] * (1.0 - mixT) + staticRecolorState.toColor[0] * mixT,
+        staticRecolorState.fromColor[1] * (1.0 - mixT) + staticRecolorState.toColor[1] * mixT,
+        staticRecolorState.fromColor[2] * (1.0 - mixT) + staticRecolorState.toColor[2] * mixT
+      ];
+      setStaticColor(index, color);
+
+      if (mixT >= 1.0) {
+        setStaticColor(index, staticRecolorState.toColor);
+        staticRecolorState.activeIndex = -1;
+      }
+    }
+
+    // Only the pink plate shape is used by the shader.
+    const staticShapeParams = new Float32Array([0.56, 0.030, 0.62, 0.28]);
+    const flowOffset = pickSteppedValue(300, 650, 25);
+    const timeLead = rand(0.0, 10.0);
+    const paletteAxisMode = Math.floor(Math.random() * 3);
+    const colAAMirrorMode = Math.random() < 0.5 ? "normal" : "mirrorX";
+    const modeParams = {
+      A: {
+        tau: pickSteppedValue(2.2, 3.8, 0.2),
+        maxIter: pickSteppedValue(4, 8, 1),
+        cX: 1.5,
+        cY: 2.0,
+        coYh: pickSteppedValue(1.75, 2.75, 0.25),
+        coXh: pickSteppedValue(3.5, 5.0, 0.25)
+      },
+      B: {
+        tau: pickSteppedValue(3.2, 5.8, 0.2),
+        maxIter: pickSteppedValue(6, 12, 1),
+        cX: 2.0,
+        cY: .5,
+        coYh: pickSteppedValue(1.75, 2.75, 0.25),
+        coXh: pickSteppedValue(3.5, 5.0, 0.25)
+      },
+      C: {
+        tau: pickSteppedValue(4.2, 9.8, 0.2),
+        maxIter: pickSteppedValue(10, 15, 1),
+        cX: 1.0,
+        cY: 1.0,
+        coYh: pickSteppedValue(1.75, 2.75, 0.25),
+        coXh: pickSteppedValue(3.5, 5.0, 0.25)
+      },
+      D: {
+        tau: pickSteppedValue(4.2, 9.8, 0.2),
+        maxIter: pickSteppedValue(4, 15, 1),
+        cX: 1.0,
+        cY: 1.0,
+        coYh: pickSteppedValue(1.75, 2.75, 0.25),
+        coXh: pickSteppedValue(3.5, 5.0, 0.25)
+      },
+      E: {
+        tau: pickSteppedValue(4.2, 9.8, 0.2),
+        maxIter: pickSteppedValue(3, 6, 1),
+        cX: 1.0,
+        cY: 1.0,
+        coYh: pickSteppedValue(1.75, 2.75, 0.25),
+        coXh: pickSteppedValue(3.5, 5.0, 0.25)
+      }
+    };
+    const activeModeParams = modeParams[renderMode];
+    const paletteAxisLabel = paletteAxisMode === 0 ? "0.5*xy.y" : paletteAxisMode === 1 ? "0.5*xy.x" : "none";
+    const colAAMirrorLabel = colAAMirrorMode === "mirrorX" ? "mirrorX" : "normal";
+    console.log(
+      `[Infinite] mode: ${renderMode}, TAU: ${activeModeParams.tau}, MAX_ITER: ${activeModeParams.maxIter}, cX: ${activeModeParams.cX}, cY: ${activeModeParams.cY}, coYh: ${activeModeParams.coYh}, coXh: ${activeModeParams.coXh}, time lead: ${timeLead.toFixed(2)}, palette axis: ${paletteAxisLabel}, colAA mode: ${colAAMirrorLabel}, flow: ${flowMode}, dynamic color mode: ${dynamicColorMode}, static color mode: ${staticColorMode}, palette: ${paletteMode}, colAA phase: ${colAAPhase}, persistent colAA layer: ${persistentColAALayerEnabled ? "on" : "off"}, flow offset: ${flowOffset}`
+    );
+
+    const layers = Array.from({ length: MAX_LAYERS }, () => ({
+      active: false,
+      x: 0,
+      y: 0,
+      age: 0,
+      scale: 1,
+      sx: 0,
+      sy: 0,
+      speed: 0,
+      k: 2,
+      phase: 0,
+      baseIntensity: 0.6,
+      intensity: 0.0,
+      color: [1, 1, 1],
+      dirX: 1,
+      nextDirChange: 0,
+      nextColorChange: 0,
+      colorMix: 1,
+      fromColor: [1, 1, 1],
+      toColor: [1, 1, 1]
+    }));
+
+    const persistentLayerIndex = MAX_LAYERS - 1;
+    const persistentLayer = layers[persistentLayerIndex];
+
+    function spawnLayer(index, { immediate = false } = {}) {
+      const sx = flowMode === "upflow" ? rand(0.24, 0.80) : rand(0.28, 0.92);
+      const sy = flowMode === "upflow" ? rand(0.12, 0.48) : rand(0.16, 0.68);
+      const yJitter = rand(-0.03, 0.03);
+      const yStart = flowMode === "upflow"
+        ? 0.24 + yJitter
+        : (immediate ? 1.02 + yJitter : 1.0 + sy + rand(0.04, 0.24));
+
+      layers[index].active = true;
+      layers[index].sx = sx;
+      layers[index].sy = sy;
+      layers[index].x = rand(0.26, 0.74);
+      layers[index].y = yStart;
+      layers[index].age = 0.0;
+      layers[index].scale = flowMode === "upflow" ? 0.0 : 1.0;
+      layers[index].speed = flowMode === "upflow" ? rand(0.005, 0.0105) : rand(0.008, 0.0155);
+      layers[index].k = rand(3.8, 6.2);
+      layers[index].phase = Math.random() * 10.0;
+      layers[index].baseIntensity = rand(0.44, 0.82);
+      layers[index].intensity = 0.0;
+      layers[index].color = pickDynamicColorByY(yStart);
+    }
+
+    function setupPersistentColAALayer() {
+      if (!persistentColAALayerEnabled) {
+        persistentLayer.active = false;
+        return;
+      }
+      const startY = rand(0.42, 0.74);
+      persistentLayer.active = true;
+      persistentLayer.x = rand(0.24, 0.76);
+      persistentLayer.y = startY;
+      persistentLayer.age = 0.0;
+      persistentLayer.scale = 1.0;
+      persistentLayer.sx = rand(0.18, 0.56);
+      persistentLayer.sy = rand(0.10, 0.36);
+      persistentLayer.speed = rand(0.002, 0.004);
+      persistentLayer.k = rand(4.2, 6.0);
+      persistentLayer.phase = Math.random() * 10.0;
+      persistentLayer.baseIntensity = rand(0.40, 0.68);
+      persistentLayer.intensity = persistentLayer.baseIntensity;
+      persistentLayer.color = pickDynamicColorByY(startY);
+      persistentLayer.dirX = Math.random() < 0.5 ? -1 : 1;
+      persistentLayer.nextDirChange = rand(5.0, 12.0);
+      persistentLayer.nextColorChange = rand(6.0, 14.0);
+      persistentLayer.colorMix = 1.0;
+      persistentLayer.fromColor = persistentLayer.color.slice();
+      persistentLayer.toColor = persistentLayer.color.slice();
+    }
+
+    for (let i = 0; i < DYNAMIC_LAYER_SLOTS; i++) {
+      spawnLayer(i, { immediate: true });
+      layers[i].x += i * 0.10;
+    }
+    setupPersistentColAALayer();
+
+    setInterval(() => {
+      if (flowMode === "upflow") {
+        const activeCount = layers.slice(0, DYNAMIC_LAYER_SLOTS).reduce((n, l) => n + (l.active ? 1 : 0), 0);
+        if (activeCount >= 3) return;
+      }
+      const idx = layers.slice(0, DYNAMIC_LAYER_SLOTS).findIndex((l) => !l.active);
+      if (idx !== -1) spawnLayer(idx);
+    }, 2800);
+
+    let lastTime = 0;
+
+    function draw(nowMs) {
+      const now = nowMs * 0.001;
+      const dt = Math.min(0.05, Math.max(0.0, now - lastTime));
+      lastTime = now;
+
+      for (let i = 0; i < DYNAMIC_LAYER_SLOTS; i++) {
+        const l = layers[i];
+        if (!l.active) continue;
+        if (flowMode === "upflow") {
+          l.age += dt;
+          l.y += l.speed * dt;
+          const fadeInPos = smoothstep01(0.18, 0.44, l.y);
+          const fadeInTime = smoothstep01(0.0, 6.0, l.age);
+          const fadeOut = 1.0 - smoothstep01(1.08, 1.48, l.y);
+          const shrinkNearTop = 1.0 - smoothstep01(1.04, 1.42, l.y);
+          l.scale = Math.max(0.0, fadeInTime * shrinkNearTop);
+          l.intensity = l.baseIntensity * fadeInPos * fadeInTime * fadeOut;
+          if (l.y - l.sy > 1.55) l.active = false;
+        } else {
+          l.y -= l.speed * dt;
+          l.scale = 1.0;
+          const fadeIn = 1.0 - smoothstep01(0.90, 1.08, l.y);
+          const fadeOut = smoothstep01(-0.02, 0.16, l.y + l.sy);
+          l.intensity = l.baseIntensity * fadeIn * fadeOut;
+          if (l.y + l.sy < -0.10) l.active = false;
+        }
+      }
+
+      if (persistentColAALayerEnabled && persistentLayer.active) {
+        persistentLayer.age += dt;
+        persistentLayer.x += persistentLayer.dirX * persistentLayer.speed * dt;
+        persistentLayer.intensity = persistentLayer.baseIntensity;
+
+        if (persistentLayer.x < 0.16) {
+          persistentLayer.x = 0.16;
+          persistentLayer.dirX = 1;
+        } else if (persistentLayer.x > 0.84) {
+          persistentLayer.x = 0.84;
+          persistentLayer.dirX = -1;
+        }
+
+        persistentLayer.nextDirChange -= dt;
+        if (persistentLayer.nextDirChange <= 0.0) {
+          persistentLayer.dirX *= Math.random() < 0.5 ? 1 : -1;
+          persistentLayer.nextDirChange = rand(5.0, 12.0);
+        }
+
+        persistentLayer.nextColorChange -= dt;
+        if (persistentLayer.nextColorChange <= 0.0) {
+          persistentLayer.fromColor = persistentLayer.color.slice();
+          persistentLayer.toColor = pickDynamicColorByY(persistentLayer.y);
+          persistentLayer.colorMix = 0.0;
+          persistentLayer.nextColorChange = rand(6.0, 14.0);
+        }
+
+        if (persistentLayer.colorMix < 1.0) {
+          persistentLayer.colorMix = Math.min(1.0, persistentLayer.colorMix + dt / 5.0);
+          for (let c = 0; c < 3; c++) {
+            persistentLayer.color[c] =
+              persistentLayer.fromColor[c] * (1.0 - persistentLayer.colorMix) +
+              persistentLayer.toColor[c] * persistentLayer.colorMix;
+          }
+        }
+      }
+
+      updateStaticRecolor(now);
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const w = Math.floor(canvas.clientWidth * dpr);
+      const h = Math.floor(canvas.clientHeight * dpr);
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      gl.viewport(0, 0, w, h);
+      gl.uniform2f(uRes, w, h);
+      gl.uniform1f(uTime, now);
+      gl.uniform1f(uTAU, activeModeParams.tau);
+      gl.uniform1i(uMaxIter, activeModeParams.maxIter);
+      gl.uniform1f(uCX, activeModeParams.cX);
+      gl.uniform1f(uCY, activeModeParams.cY);
+      gl.uniform1f(uCoYh, activeModeParams.coYh);
+      gl.uniform1f(uCoXh, activeModeParams.coXh);
+      gl.uniform1f(uTimeLead, timeLead);
+      gl.uniform1f(uPaletteAxisMode, paletteAxisMode);
+      gl.uniform1f(uColAAMirrorMode, colAAMirrorMode === "mirrorX" ? 1.0 : 0.0);
+      gl.uniform1f(uFlowOffset, flowOffset);
+
+      const layerData = new Float32Array(MAX_LAYERS * 4);
+      const colorData = new Float32Array(MAX_LAYERS * 4);
+      const paramData = new Float32Array(MAX_LAYERS * 2);
+      for (let i = 0; i < MAX_LAYERS; i++) {
+        const l = layers[i];
+        const b4 = i * 4;
+        const b2 = i * 2;
+        layerData[b4] = l.x;
+        layerData[b4 + 1] = l.y;
+        layerData[b4 + 2] = l.active ? l.sx * l.scale : 0;
+        layerData[b4 + 3] = l.active ? l.sy * l.scale : 0;
+        colorData[b4] = l.color[0];
+        colorData[b4 + 1] = l.color[1];
+        colorData[b4 + 2] = l.color[2];
+        colorData[b4 + 3] = l.active ? l.intensity : 0;
+        paramData[b2] = l.k;
+        paramData[b2 + 1] = l.phase;
+      }
+
+      gl.uniform4fv(uLayers, layerData);
+      gl.uniform4fv(uLayerColors, colorData);
+      gl.uniform2fv(uLayerParams, paramData);
+      gl.uniform4fv(uStaticShapeParams, staticShapeParams);
+      gl.uniform3fv(uStaticCols, staticCols);
+      gl.uniform1f(
+        uEdgeSoftMode,
+        (staticColorMode === "random60Dark" || staticColorMode === "random90Dark" || staticColorMode === "randomAll") ? 1.0 : 0.0
+      );
+      gl.uniform1i(uColAAPhase, colAAPhase);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener("resize", () => draw(performance.now()));
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

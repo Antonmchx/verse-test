@@ -1,0 +1,771 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" href="./favicon.png" />
+  <meta name="theme-color" content="#8990BB" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <title>Soft Continuum ∞ Gallery</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --fg: #aab0d0;
+      --line: rgba(209, 203, 255, 0.18);
+      --panel: rgba(137, 144, 187, 0.22);
+      --panel-strong: rgba(137, 144, 187, 0.44);
+      --header-bg: #8990BB;
+      --header-edge: rgba(255, 255, 255, 0.12);
+      --shadow: rgba(72, 62, 111, 0.18);
+      --active: rgba(214, 217, 244, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      padding: 0;
+    }
+
+    .page {
+      width: 100%;
+      min-height: 100vh;
+      position: relative;
+    }
+
+    .header {
+      position: absolute;
+      inset: 0 0 auto 0;
+      z-index: 3;
+      pointer-events: auto;
+    }
+
+    .header-panel {
+      position: relative;
+      min-height: clamp(138px, 19vh, 184px);
+      padding: 24px 28px 10px;
+      overflow: visible;
+      pointer-events: auto;
+    }
+
+    .header-blur {
+      display: none;
+    }
+
+    .headline {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 52px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      gap: clamp(18px, 3vw, 48px);
+      flex-wrap: wrap;
+    }
+
+    .nav-right {
+      justify-content: flex-end;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    a {
+      color: var(--fg);
+      font: inherit;
+      font-size: clamp(16px, 1.5vw, 22px);
+      font-weight: 300;
+      text-decoration: none;
+      text-shadow: 0 1px 10px rgba(28, 26, 48, 0.22);
+    }
+
+    a:hover,
+    a:focus-visible {
+      opacity: 0.72;
+      outline: none;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(38px, 4.8vw, 64px);
+      font-weight: 300;
+      letter-spacing: -0.04em;
+      line-height: 0.94;
+      text-shadow: 0 2px 18px rgba(28, 26, 48, 0.24);
+    }
+
+    .infinity-link {
+      position: absolute;
+      top: 24px;
+      right: 28px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--fg);
+      text-decoration: none;
+      pointer-events: auto;
+    }
+
+    .infinity-link:hover,
+    .infinity-link:focus-visible {
+      opacity: 0.72;
+      outline: none;
+    }
+
+    .infinity-link svg {
+      width: clamp(52px, 5.6vw, 84px);
+      height: clamp(28px, 2.8vw, 40px);
+      stroke: currentColor;
+      stroke-width: 1.8;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 2px 18px rgba(28, 26, 48, 0.24));
+    }
+
+    .viewer {
+      position: absolute;
+      top: 100px;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: var(--bg);
+      overflow: hidden;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 148px 24px 24px;
+      z-index: 2;
+      overflow: auto;
+      pointer-events: none;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 18px 16px;
+      align-content: start;
+      pointer-events: auto;
+    }
+
+    .tile {
+      display: grid;
+      gap: 10px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .tile:focus-visible {
+      outline: none;
+    }
+
+    .tile-thumb {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: rgba(120, 125, 146, 0.28);
+      box-shadow: 0 18px 34px rgba(24, 21, 43, 0.08);
+      transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .tile:hover .tile-thumb,
+    .tile:focus-visible .tile-thumb {
+      transform: translateY(-2px);
+      border-color: rgba(209, 203, 255, 0.4);
+      box-shadow: 0 24px 42px rgba(24, 21, 43, 0.14);
+    }
+
+    .tile-thumb img,
+    .tile-thumb iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      object-fit: cover;
+      display: block;
+    }
+
+    .tile-thumb iframe {
+      pointer-events: none;
+      background: rgba(10, 10, 16, 0.82);
+    }
+
+    .empty-state {
+      padding: 24px 0;
+      font-size: 15px;
+      line-height: 1.5;
+      color: rgba(170, 176, 208, 0.78);
+      pointer-events: auto;
+    }
+
+    .tile-thumb.placeholder::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255, 215, 170, 0.4) 0 14%, transparent 28%),
+        linear-gradient(180deg, rgba(110, 122, 140, 0.75) 0%, rgba(189, 146, 174, 0.72) 62%, rgba(151, 132, 184, 0.72) 100%);
+      opacity: 0.88;
+    }
+
+    .tile-thumb.placeholder::before {
+      content: "Preview";
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      z-index: 1;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(245, 243, 255, 0.82);
+    }
+
+    .tile-number {
+      font-size: 15px;
+      line-height: 1.1;
+      letter-spacing: 0.04em;
+    }
+
+    .lightbox[hidden] {
+      display: none;
+    }
+
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: rgba(137, 144, 187, 0.18);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .lightbox-backdrop {
+      position: absolute;
+      inset: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .lightbox-dialog {
+      position: relative;
+      z-index: 1;
+      width: min(76vmin, 760px);
+      aspect-ratio: 1 / 1;
+      overflow: hidden;
+      border: 1px solid rgba(209, 203, 255, 0.24);
+      background: rgba(137, 144, 187, 0.24);
+      box-shadow: 0 32px 70px rgba(24, 21, 43, 0.22);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .lightbox-meta {
+      position: absolute;
+      inset: 0 0 auto 0;
+      z-index: 2;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      background: transparent;
+    }
+
+    .lightbox-label {
+      font-size: 15px;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+    }
+
+    .lightbox-copy {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+      padding-top: 10px;
+    }
+
+    .lightbox-subline,
+    .lightbox-date {
+      font-size: 12px;
+      line-height: 1.35;
+      opacity: 0.78;
+      white-space: nowrap;
+    }
+
+    .lightbox-actions {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .gallery-note {
+      position: absolute;
+      top: 106px;
+      left: 28px;
+      z-index: 2;
+      font-size: 14px;
+      line-height: 1.4;
+      color: rgba(170, 176, 208, 0.82);
+      text-shadow: 0 1px 10px rgba(28, 26, 48, 0.2);
+      pointer-events: auto;
+    }
+
+    .gallery-note a {
+      font-size: inherit;
+    }
+
+    .mini-button {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .mini-button:hover,
+    .mini-button:focus-visible {
+      outline: none;
+      opacity: 0.72;
+    }
+
+    .mini-button svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .lightbox-stage {
+      position: absolute;
+      inset: 0;
+      background: rgba(14, 17, 37, 0.3);
+    }
+
+    .lightbox-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #0f1534;
+    }
+
+    @media (max-width: 1100px) {
+      .grid {
+        grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .header-panel {
+        min-height: 124px;
+        padding: 14px 14px 24px;
+      }
+
+      .headline {
+        margin-bottom: 0;
+      }
+
+      .infinity-link {
+        top: 14px;
+        right: 14px;
+      }
+
+      .overlay {
+        inset: 124px 12px 12px;
+      }
+
+      .grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 12px;
+      }
+
+      .tile-number {
+        font-size: 14px;
+      }
+
+      .lightbox {
+        padding: 12px;
+      }
+
+      .lightbox-dialog {
+        width: min(100%, 92vw);
+      }
+
+      .lightbox-meta {
+        padding: 12px;
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .lightbox-actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div class="header-panel">
+        <div class="header-blur" aria-hidden="true"></div>
+        <div class="headline">
+          <h1>Gallery ∞</h1>
+        </div>
+        <a href="index.html" class="infinity-link" aria-label="Back to index">
+          <svg viewBox="0 0 40 24" aria-hidden="true">
+            <path d="M37 12H6"/>
+            <path d="M13 19 6 12l7-7"/>
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <div class="gallery-note">
+      Sandbox release:
+      <a id="gallery-release-link" href="https://demo.verse.works/series/gen-project-test-by-mchx-test-acc" target="_blank" rel="noopener noreferrer">open on Verse</a>
+    </div>
+
+    <section class="viewer" aria-label="Фон галереи">
+      <div class="overlay">
+        <section class="grid" id="iterations-grid" aria-label="Список заминченных итераций"></section>
+      </div>
+    </section>
+
+    <section class="lightbox" id="lightbox" hidden aria-label="Просмотр итерации">
+      <button type="button" class="lightbox-backdrop" id="lightbox-backdrop" aria-label="Close preview"></button>
+      <div class="lightbox-dialog">
+        <div class="lightbox-meta">
+          <div class="lightbox-copy">
+            <div class="lightbox-label" id="lightbox-label">Soft Continuum ∞ #001</div>
+            <div class="lightbox-subline" id="lightbox-subline">Collected by 0xA91E...4D2F</div>
+            <div class="lightbox-date" id="lightbox-date">2026-06-21</div>
+          </div>
+          <div class="lightbox-actions">
+            <a class="mini-button" id="verse-button" href="https://verse.works/" target="_blank" rel="noopener noreferrer" aria-label="Open Verse">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 5h16l-6.5 14h-3L4 5Z"/>
+              </svg>
+            </a>
+            <button type="button" class="mini-button" id="reload-button" aria-label="Reload">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M20 11a8 8 0 1 1-2.34-5.66"/>
+                <path d="M20 4v5h-5"/>
+              </svg>
+            </button>
+            <a class="mini-button" id="open-button" href="Infinite_everglade_no_magentaCore.html" target="_blank" rel="noopener noreferrer" aria-label="Open in new tab">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M14 5h5v5"/>
+                <path d="M10 14 19 5"/>
+                <path d="M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4"/>
+              </svg>
+            </a>
+            <button type="button" class="mini-button" id="close-button" aria-label="Close">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 6 18 18"/>
+                <path d="M18 6 6 18"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="lightbox-stage">
+          <iframe
+            class="lightbox-frame"
+            id="lightbox-frame"
+            title="Selected iteration preview"
+            loading="eager"></iframe>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="verse-shared.js"></script>
+  <script>
+    const verseShared = window.SOFT_CONTINUUM_VERSE;
+    const grid = document.getElementById("iterations-grid");
+    const lightbox = document.getElementById("lightbox");
+    const lightboxBackdrop = document.getElementById("lightbox-backdrop");
+    const lightboxFrame = document.getElementById("lightbox-frame");
+    const lightboxLabel = document.getElementById("lightbox-label");
+    const lightboxSubline = document.getElementById("lightbox-subline");
+    const lightboxDate = document.getElementById("lightbox-date");
+    const openButton = document.getElementById("open-button");
+    const reloadButton = document.getElementById("reload-button");
+    const closeButton = document.getElementById("close-button");
+    const verseButton = document.getElementById("verse-button");
+    const galleryReleaseLink = document.getElementById("gallery-release-link");
+    let activeItem = null;
+    let iterationsCache = [];
+
+    function syncVerseLinks() {
+      const verseConfig = verseShared.getConfig();
+      verseButton.href = verseConfig.artworkUrl;
+      galleryReleaseLink.href = verseConfig.artworkUrl;
+    }
+
+    function formatMintedAt(value) {
+      if (!value) return "Minted on Verse";
+
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "Minted on Verse";
+
+      return date.toLocaleString("ru-RU", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Moscow"
+      });
+    }
+
+    function editionOwnerLabel(owner) {
+      if (!owner) return "Verse collector";
+      if (owner.__typename === "UserEditionOwner" && owner.owner && owner.owner.username) {
+        return `@${owner.owner.username}`;
+      }
+      return "Verse collector";
+    }
+
+    async function fetchIterationIframeUrl(artworkId, hash) {
+      if (!hash) return null;
+
+      const response = await fetch(verseShared.SANDBOX_GRAPHQL_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          query: `
+            query IterationPreview($artworkId: ArtworkID!, $hash: String!) {
+              projectStaticAssetByHash(artworkId: $artworkId, hash: $hash) {
+                __typename
+                ... on IFrameAsset {
+                  iframeUrl
+                }
+              }
+            }
+          `,
+          variables: {
+            artworkId,
+            hash
+          }
+        })
+      });
+
+      const payload = await response.json();
+      const asset = payload && payload.data && payload.data.projectStaticAssetByHash;
+      return asset && asset.__typename === "IFrameAsset" ? asset.iframeUrl : null;
+    }
+
+    async function fetchLiveIterations() {
+      const verseConfig = verseShared.getConfig();
+      const response = await fetch(verseShared.SANDBOX_GRAPHQL_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          query: `
+            query GalleryIterations($artworkId: ArtworkID!) {
+              artworks(filter: { id: $artworkId }) {
+                id
+                title
+                artist {
+                  name
+                }
+                artworkKind {
+                  __typename
+                  ... on GenerativeProjectArtworkKind {
+                    iframeUrl
+                  }
+                }
+                editions {
+                  id
+                  editionNumber
+                  createdAt
+                  hash
+                  owner {
+                    __typename
+                    ... on UserEditionOwner {
+                      owner {
+                        username
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `,
+          variables: {
+            artworkId: verseConfig.artworkId
+          }
+        })
+      });
+
+      const payload = await response.json();
+      const artwork = payload && payload.data && payload.data.artworks && payload.data.artworks[0];
+      const editions = artwork && Array.isArray(artwork.editions) ? artwork.editions : [];
+
+      const items = await Promise.all(editions.map(async (edition) => {
+        const previewIframeUrl = await fetchIterationIframeUrl(verseConfig.artworkId, edition.hash).catch(() => null);
+        return {
+          id: edition.id || `verse-${edition.editionNumber}`,
+          editionId: edition.id || null,
+          editionNumber: String(edition.editionNumber).padStart(3, "0"),
+          collector: editionOwnerLabel(edition.owner),
+          mintedAt: formatMintedAt(edition.createdAt),
+          artworkUrl: `https://demo.verse.works/artworks/${verseConfig.artworkId}?editionNumber=${edition.editionNumber}`,
+          iframeUrl: previewIframeUrl || (artwork && artwork.artworkKind && artwork.artworkKind.iframeUrl) || verseConfig.iframeUrl,
+          previewIframeUrl: previewIframeUrl || (artwork && artwork.artworkKind && artwork.artworkKind.iframeUrl) || verseConfig.iframeUrl,
+          previewImageUrl: "",
+          title: (artwork && artwork.title) || verseConfig.artworkTitle,
+          artistName: (artwork && artwork.artist && artwork.artist.name) || verseConfig.artistName,
+          hash: edition.hash || ""
+        };
+      }));
+
+      return items.sort((a, b) => Number(b.editionNumber) - Number(a.editionNumber));
+    }
+
+    function renderGrid(iterations, stateMessage = "") {
+      grid.innerHTML = "";
+
+      if (!iterations.length) {
+        const empty = document.createElement("div");
+        empty.className = "empty-state";
+        empty.textContent = stateMessage || "No minted iterations yet. As soon as editions appear on Verse, they will show up here.";
+        grid.appendChild(empty);
+        return;
+      }
+
+      iterations.forEach((item) => {
+        const tile = document.createElement("button");
+        tile.type = "button";
+        tile.className = "tile";
+        tile.dataset.id = item.id;
+        tile.setAttribute("aria-label", `${item.title} #${item.editionNumber}`);
+        tile.innerHTML = `
+          <div class="tile-thumb ${item.previewIframeUrl || item.previewImageUrl ? "" : "placeholder"}">
+            ${item.previewIframeUrl
+              ? `<iframe title="${item.title} #${item.editionNumber} preview" src="${item.previewIframeUrl}" loading="lazy" tabindex="-1"></iframe>`
+              : `<img alt="${item.title} #${item.editionNumber} thumbnail" ${item.previewImageUrl ? `src="${item.previewImageUrl}"` : ""} />`}
+          </div>
+          <div class="tile-number">#${item.editionNumber}</div>
+        `;
+
+        tile.addEventListener("click", () => {
+          openIteration(item.id);
+        });
+
+        grid.appendChild(tile);
+      });
+    }
+
+    function openIteration(id) {
+      const item = iterationsCache.find((entry) => entry.id === id);
+      if (!item) return;
+
+      activeItem = item;
+      lightboxLabel.textContent = `${item.title} #${item.editionNumber}`;
+      lightboxSubline.textContent = `Collected by ${item.collector}`;
+      lightboxDate.textContent = item.mintedAt;
+      lightboxFrame.src = item.iframeUrl;
+      openButton.href = item.iframeUrl;
+      verseButton.href = item.artworkUrl;
+      lightbox.hidden = false;
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeIteration() {
+      lightbox.hidden = true;
+      lightboxFrame.src = "about:blank";
+      document.body.style.overflow = "hidden";
+      activeItem = null;
+    }
+
+    function reloadIteration() {
+      if (!activeItem) return;
+
+      lightboxFrame.src = `${activeItem.iframeUrl}?refresh=${Date.now()}`;
+    }
+
+    reloadButton.addEventListener("click", reloadIteration);
+    closeButton.addEventListener("click", closeIteration);
+    lightboxBackdrop.addEventListener("click", closeIteration);
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !lightbox.hidden) {
+        closeIteration();
+      }
+    });
+
+    async function initGallery() {
+      renderGrid([], "Loading minted iterations from Verse...");
+
+      try {
+        const liveIterations = await fetchLiveIterations();
+        iterationsCache = liveIterations;
+
+        if (liveIterations.length) {
+          renderGrid(liveIterations);
+          return;
+        }
+      } catch (error) {
+        console.error("Verse gallery sync failed:", error);
+      }
+
+      const localIterations = verseShared.getMints();
+      iterationsCache = localIterations;
+      renderGrid(
+        localIterations,
+        localIterations.length
+          ? ""
+          : "Verse minted editions are not available right now. Local sandbox purchases will appear here as a fallback."
+      );
+    }
+
+    initGallery();
+    syncVerseLinks();
+  </script>
+</body>
+</html>
