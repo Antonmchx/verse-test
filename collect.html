@@ -319,6 +319,19 @@
       opacity: 0.86;
     }
 
+    .auth-button {
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: var(--fg);
+      font: inherit;
+      font-size: 14px;
+      opacity: 0.86;
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
     .params-list {
       display: grid;
       gap: 10px;
@@ -344,6 +357,71 @@
       font-size: 15px;
       line-height: 1.35;
       word-break: break-word;
+    }
+
+    .mint-dialog {
+      border: 0;
+      border-radius: 22px;
+      padding: 32px 36px;
+      max-width: 420px;
+      width: calc(100vw - 48px);
+      background: rgba(244, 239, 230, 0.97);
+      color: var(--button-fg);
+      box-shadow: 0 24px 60px rgba(72, 62, 111, 0.35);
+      text-align: center;
+    }
+
+    .mint-dialog::backdrop {
+      background: rgba(61, 67, 81, 0.42);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+
+    .mint-dialog h2 {
+      margin: 0 0 6px;
+      font-size: 30px;
+      font-weight: 300;
+      letter-spacing: -0.03em;
+    }
+
+    .mint-edition {
+      margin: 0 0 14px;
+      font-size: 20px;
+      color: var(--header-bg);
+    }
+
+    .mint-meta {
+      margin: 0 0 6px;
+      font-size: 15px;
+      opacity: 0.85;
+    }
+
+    .mint-id {
+      margin: 0 0 22px;
+      font-size: 12px;
+      opacity: 0.55;
+      word-break: break-all;
+    }
+
+    .mint-actions {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .mint-actions a,
+    .mint-actions button {
+      font-size: 15px;
+      color: var(--button-fg);
+      text-shadow: none;
+      cursor: pointer;
+      border: 0;
+      background: transparent;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      padding: 0;
     }
 
     @media (max-width: 720px) {
@@ -432,6 +510,11 @@
           <section class="verse-panel" aria-label="Verse sandbox controls">
             <div class="params-title">Verse Sandbox</div>
             <div class="verse-status" id="verse-status">Preparing purchase flow…</div>
+            <div class="verse-status" id="auth-status">Checking Verse session…</div>
+            <div class="verse-links">
+              <button type="button" class="auth-button" id="sign-in-button" hidden>Sign in to Verse</button>
+              <button type="button" class="auth-button" id="sign-out-button" hidden>Sign out</button>
+            </div>
             <div class="sale-status" id="sale-status">Loading live sale status from Verse…</div>
             <div class="verse-links">
               <a id="verse-release-link" href="https://demo.verse.works/series/gen-project-test-by-mchx-test-acc" target="_blank" rel="noopener noreferrer">Open release on Verse</a>
@@ -443,6 +526,17 @@
     </section>
   </main>
 
+  <dialog class="mint-dialog" id="mint-dialog" aria-label="Purchase complete">
+    <h2>Collected ∞</h2>
+    <p class="mint-edition" id="mint-dialog-edition"></p>
+    <p class="mint-meta" id="mint-dialog-meta"></p>
+    <p class="mint-id" id="mint-dialog-id"></p>
+    <div class="mint-actions">
+      <a id="mint-dialog-link" href="#" target="_blank" rel="noopener noreferrer">View release on Verse</a>
+      <button type="button" id="mint-dialog-close">Close</button>
+    </div>
+  </dialog>
+
   <script src="verse-shared.js"></script>
   <script src="https://unpkg.com/verse-embedded@1.1.5/dist/verse-elements.js"></script>
   <script>
@@ -453,10 +547,20 @@
     const collectButton = document.getElementById("collect-button");
     const paramsList = document.getElementById("params-list");
     const verseStatus = document.getElementById("verse-status");
+    const authStatusNode = document.getElementById("auth-status");
+    const signInButton = document.getElementById("sign-in-button");
+    const signOutButton = document.getElementById("sign-out-button");
     const saleStatusNode = document.getElementById("sale-status");
     const verseReleaseLink = document.getElementById("verse-release-link");
+    const mintDialog = document.getElementById("mint-dialog");
+    const mintDialogEdition = document.getElementById("mint-dialog-edition");
+    const mintDialogMeta = document.getElementById("mint-dialog-meta");
+    const mintDialogId = document.getElementById("mint-dialog-id");
+    const mintDialogLink = document.getElementById("mint-dialog-link");
+    const mintDialogClose = document.getElementById("mint-dialog-close");
     let elements = null;
     let saleState = null;
+    let signedInUsername = null;
 
     const paletteModes = ["Pastel bandfield", "Soft dusk", "Amber bloom", "Mirror violet"];
     const flowModes = ["Slow drift", "Cross-current", "Ribbon field", "Lateral bloom"];
@@ -519,6 +623,64 @@
       verseStatus.style.color = isError ? "rgb(225, 189, 197)" : "";
     }
 
+    function showMintDialog(result) {
+      const activeConfig = verseShared.getConfig();
+      mintDialogEdition.textContent = result && result.editionNumber
+        ? `Edition #${String(result.editionNumber).padStart(3, "0")}`
+        : "New edition minted";
+      mintDialogMeta.textContent = `${activeConfig.artworkTitle} — ${activeConfig.artistName}`;
+      mintDialogId.textContent = result && result.editionId ? `Edition ID: ${result.editionId}` : "";
+      mintDialogLink.href = activeConfig.artworkUrl;
+      mintDialog.showModal();
+    }
+
+    mintDialogClose.addEventListener("click", () => mintDialog.close());
+    mintDialog.addEventListener("click", (event) => {
+      if (event.target === mintDialog) mintDialog.close();
+    });
+
+    function renderAuthState(isSignedIn) {
+      if (isSignedIn) {
+        authStatusNode.textContent = signedInUsername
+          ? `Signed in to Verse as ${signedInUsername}.`
+          : "Signed in to Verse.";
+      } else {
+        signedInUsername = null;
+        authStatusNode.textContent = "Not signed in to Verse.";
+      }
+      signInButton.hidden = isSignedIn;
+      signOutButton.hidden = !isSignedIn;
+    }
+
+    async function refreshAuthState() {
+      try {
+        const isSignedIn = await elements.checkAuth();
+        renderAuthState(isSignedIn);
+      } catch (error) {
+        authStatusNode.textContent = `Could not check Verse session: ${error.message}`;
+        signInButton.hidden = false;
+        signOutButton.hidden = true;
+      }
+    }
+
+    async function ensureAuth() {
+      const isSignedIn = await elements.checkAuth();
+      if (isSignedIn) {
+        renderAuthState(true);
+        return true;
+      }
+
+      const result = await elements.authorise();
+      if (!result) {
+        renderAuthState(false);
+        return false;
+      }
+
+      signedInUsername = result.verseUsername || null;
+      renderAuthState(true);
+      return true;
+    }
+
     function syncVerseLinks() {
       const verseConfig = verseShared.getConfig();
       verseReleaseLink.href = verseConfig.artworkUrl;
@@ -575,6 +737,10 @@
                     ... on PMBuyNowLimitedEditionStrategy {
                       maxEditions
                       reservedEditions
+                      price {
+                        value
+                        currency
+                      }
                       stats {
                         issuedEditions
                       }
@@ -604,7 +770,10 @@
         startedAt: listing.startedAt,
         maxEditions: Number(strategy.maxEditions || 0),
         reservedEditions: Number(strategy.reservedEditions || 0),
-        issuedEditions: Number((strategy.stats && strategy.stats.issuedEditions) || 0)
+        issuedEditions: Number((strategy.stats && strategy.stats.issuedEditions) || 0),
+        price: strategy.price && strategy.price.value
+          ? { value: String(strategy.price.value), currency: strategy.price.currency }
+          : null
       };
 
       renderSaleStatus();
@@ -629,6 +798,7 @@
       syncVerseLinks();
       loadVerseArtwork();
       setVerseStatus("Sandbox purchase flow is ready on localhost.");
+      refreshAuthState();
       fetchSaleStatus().catch((error) => {
         saleStatusNode.textContent = `Could not load live sale status: ${error.message}`;
       });
@@ -669,7 +839,36 @@
       refreshIterationParams();
     });
 
-    collectButton.addEventListener("click", () => {
+    signInButton.addEventListener("click", async () => {
+      if (!elements) {
+        setVerseStatus("Verse SDK is not ready yet.", true);
+        return;
+      }
+
+      try {
+        const signedIn = await ensureAuth();
+        setVerseStatus(signedIn ? "Signed in to Verse." : "Sign-in dialog was closed.");
+      } catch (error) {
+        setVerseStatus(`Sign-in failed: ${error.message}`, true);
+      }
+    });
+
+    signOutButton.addEventListener("click", async () => {
+      if (!elements) {
+        setVerseStatus("Verse SDK is not ready yet.", true);
+        return;
+      }
+
+      try {
+        await elements.signOut();
+        renderAuthState(false);
+        setVerseStatus("Signed out of Verse.");
+      } catch (error) {
+        setVerseStatus(`Sign-out failed: ${error.message}`, true);
+      }
+    });
+
+    collectButton.addEventListener("click", async () => {
       if (!elements) {
         setVerseStatus("Verse SDK is not ready yet.", true);
         return;
@@ -681,11 +880,41 @@
         return;
       }
 
-      setVerseStatus("Opening Verse purchase dialog for a single edition.");
+      try {
+        const signedIn = await ensureAuth();
+        if (!signedIn) {
+          setVerseStatus("Sign in to Verse to collect this work.", true);
+          return;
+        }
+      } catch (error) {
+        setVerseStatus(`Could not verify Verse session: ${error.message}`, true);
+        return;
+      }
+
+      if (!saleState || !saleState.price) {
+        try {
+          await fetchSaleStatus();
+        } catch (error) {
+          setVerseStatus(`Could not load sale price from Verse: ${error.message}`, true);
+          return;
+        }
+      }
+
+      if (!saleState.price) {
+        setVerseStatus("This sale has no buy-now price on Verse, so the purchase dialog cannot open.", true);
+        return;
+      }
+
+      setVerseStatus(`Opening Verse purchase dialog: ${saleState.price.value} ${saleState.price.currency}.`);
 
       elements.openPurchaseDialog(
         verseConfig.artworkId,
-        {},
+        {
+          amount: {
+            value: saleState.price.value,
+            currency: saleState.price.currency
+          }
+        },
         {
           onSuccess(result) {
             const editionNumber = result && result.editionNumber
@@ -704,7 +933,9 @@
               title: activeConfig.artworkTitle,
               artistName: activeConfig.artistName
             });
-            setVerseStatus(`Purchase complete: ${JSON.stringify(result)}`);
+            setVerseStatus(`Purchase complete: edition #${editionNumber}.`);
+            showMintDialog(result);
+            fetchSaleStatus().catch(() => {});
           },
           onTerminalFailure(result) {
             const liveHint = saleState
@@ -715,6 +946,7 @@
           },
           onClose() {
             setVerseStatus("Purchase dialog closed.");
+            fetchSaleStatus().catch(() => {});
           }
         }
       );
